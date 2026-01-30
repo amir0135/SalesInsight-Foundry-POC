@@ -184,7 +184,7 @@ class TestSpeechToken:
 
         # then
         assert response.status_code == 400
-        assert response.json == {"error": "Failed to get speech config"}
+        assert response.json == {"error": "Failed to get speech config", "disabled": True}
 
     @patch("create_app.requests")
     def test_error_when_unexpected_error_occurs(
@@ -197,8 +197,8 @@ class TestSpeechToken:
         # when
         response = client.get("/api/speech")
 
-        assert response.status_code == 500
-        assert response.json == {"error": "Failed to get speech config"}
+        assert response.status_code == 503
+        assert response.json == {"error": "Speech service unavailable", "disabled": True}
 
 
 class TestConfig:

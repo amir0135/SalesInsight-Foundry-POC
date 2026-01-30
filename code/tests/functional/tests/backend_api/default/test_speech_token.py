@@ -55,5 +55,5 @@ def test_failure_fetching_speech_token(app_url: str, httpserver: HTTPServer):
 
     # then
     assert response.status_code == 400
-    assert response.json() == {"error": "Failed to get speech config"}
+    assert response.json() == {"error": "Failed to get speech config", "disabled": True}
     assert response.headers["Content-Type"] == "application/json"
