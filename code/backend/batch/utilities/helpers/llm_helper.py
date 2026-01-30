@@ -135,6 +135,18 @@ class LLMHelper:
             **kwargs
         )
 
+    def get_fast_chat_completion(
+        self, messages: list[dict], max_tokens: int = 500, **kwargs
+    ):
+        """Get a fast chat completion using the fast model (for simple tasks like SQL generation)."""
+        return self.openai_client.chat.completions.create(
+            model=self.env_helper.AZURE_OPENAI_FAST_MODEL,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=0,
+            **kwargs
+        )
+
     def get_sk_chat_completion_service(self, service_id: str):
         if self.auth_type_keys:
             return AzureChatCompletion(

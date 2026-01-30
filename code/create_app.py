@@ -607,7 +607,20 @@ def create_app():
         """Get the speech config for Azure Speech."""
         try:
             logger.info("Method speech_config started")
-            speech_key = env_helper.AZURE_SPEECH_KEY or get_speech_key(env_helper)
+
+            # Check if speech service is configured
+            if not env_helper.AZURE_SPEECH_SERVICE_REGION:
+                logger.debug("Speech service not configured")
+                return {"error": "Speech service not configured", "disabled": True}, 503
+
+            speech_key = env_helper.AZURE_SPEECH_KEY
+            if not speech_key:
+                try:
+                    speech_key = get_speech_key(env_helper)
+                except Exception as key_error:
+                    # Key-based auth might be disabled (disableLocalAuth=true)
+                    logger.debug("Could not get speech key: %s", str(key_error))
+                    return {"error": "Speech service uses RBAC only", "disabled": True}, 503
 
             response = requests.post(
                 f"{env_helper.AZURE_SPEECH_REGION_ENDPOINT}sts/v1.0/issueToken",
@@ -624,12 +637,11 @@ def create_app():
                     "languages": env_helper.AZURE_SPEECH_RECOGNIZER_LANGUAGES,
                 }
 
-            logger.error("Failed to get speech config: %s", response.text)
-            return {"error": "Failed to get speech config"}, response.status_code
+            logger.debug("Failed to get speech config: %s", response.text)
+            return {"error": "Failed to get speech config", "disabled": True}, response.status_code
         except Exception as e:
-            logger.exception("Exception in /api/speech | %s", str(e))
-
-            return {"error": "Failed to get speech config"}, 500
+            logger.debug("Speech config unavailable: %s", str(e))
+            return {"error": "Speech service unavailable", "disabled": True}, 503
         finally:
             logger.info("Method speech_config ended")
 

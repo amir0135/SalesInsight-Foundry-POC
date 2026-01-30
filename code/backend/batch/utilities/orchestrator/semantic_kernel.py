@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 
 from semantic_kernel import Kernel
 from semantic_kernel.connectors.ai.function_choice_behavior import (
@@ -37,22 +38,57 @@ class SemanticKernelOrchestrator(OrchestratorBase):
     async def orchestrate(
         self, user_message: str, chat_history: list[dict], **kwargs: dict
     ) -> list[dict]:
+        import time as timing_module
+        total_start = timing_module.perf_counter()
+        timings = {}
+
         logger.info("Method orchestrate of semantic_kernel started")
         force_database = kwargs.get("force_database", False)
 
         # If force_database is True, bypass LLM tool selection and directly query
         if force_database:
             logger.info("Force database mode: bypassing tool selection")
-            return await self._handle_force_database_query(user_message, chat_history)
+            result = await self._handle_force_database_query(user_message, chat_history)
+            timings["total"] = timing_module.perf_counter() - total_start
+            logger.info("Orchestrator timings (force_db): TOTAL=%.3f", timings["total"])
+            return result
 
         # Call Content Safety tool
         if self.config.prompts.enable_content_safety:
             if response := self.call_content_safety_input(user_message):
                 return response
 
+        step_start = timing_module.perf_counter()
+
         system_message = self.env_helper.SEMANTIC_KERNEL_SYSTEM_PROMPT
         if not system_message:
-            system_message = """You help employees to navigate only private information sources.
+            # Check if Trackman/database integration is enabled
+            use_redshift = os.getenv("USE_REDSHIFT", "false").lower() == "true"
+
+            if use_redshift:
+                system_message = """You help employees navigate information from documents AND operational databases.
+
+TOOL SELECTION - Choose the RIGHT tool for each question:
+
+1. **query_trackman** - ALWAYS use for database questions about:
+   - Errors, error counts, error messages, error_logs
+   - Disconnections, connections, connectivity_logs
+   - Facilities, bays, radar devices
+   - Questions with: "how many", "count", "total", "top N", "which has most", "list", "show"
+   - Time-based queries: "last week", "past 30 days", "yesterday"
+
+2. **search_documents** - Use for document/policy questions:
+   - Contract terms, policies, procedures
+   - Documentation content, specifications
+
+3. **text_processing** - Use for transformations:
+   - Translate, summarize, paraphrase text
+
+IMPORTANT: For ANY question about errors, disconnections, facilities, or operational metrics, use query_trackman.
+When directly replying to the user, always reply in the language the user is speaking.
+"""
+            else:
+                system_message = """You help employees to navigate only private information sources.
 You must prioritize the function call over your general knowledge for any question by calling the search_documents function.
 Call the text_processing function when the user request an operation on the current context, such as translate, summarize, or paraphrase. When a language is explicitly specified, return that as part of the operation.
 When directly replying to the user, always reply in the language the user is speaking.
@@ -86,6 +122,9 @@ You **must not** respond if asked to List all documents in your repository.
         for message in history.messages:
             chat_history_str += f"{message.role}: {message.content}\n"
 
+        timings["setup"] = timing_module.perf_counter() - step_start
+        step_start = timing_module.perf_counter()
+
         result: ChatMessageContent = (
             await self.kernel.invoke(
                 function=orchestrate_function,
@@ -93,6 +132,9 @@ You **must not** respond if asked to List all documents in your repository.
                 user_message=user_message,
             )
         ).value[0]
+
+        timings["llm_tool_selection"] = timing_module.perf_counter() - step_start
+        step_start = timing_module.perf_counter()
 
         self.log_tokens(
             prompt_tokens=result.metadata["usage"].prompt_tokens,
@@ -114,6 +156,9 @@ You **must not** respond if asked to List all documents in your repository.
                 await self.kernel.invoke(function=function, **arguments)
             ).value
 
+            timings["tool_execution"] = timing_module.perf_counter() - step_start
+            step_start = timing_module.perf_counter()
+
             self.log_tokens(
                 prompt_tokens=answer.prompt_tokens,
                 completion_tokens=answer.completion_tokens,
@@ -133,10 +178,22 @@ You **must not** respond if asked to List all documents in your repository.
                     )
                 ).value
 
+                timings["post_answering"] = timing_module.perf_counter() - step_start
+
                 self.log_tokens(
                     prompt_tokens=answer.prompt_tokens,
                     completion_tokens=answer.completion_tokens,
                 )
+
+            timings["total"] = timing_module.perf_counter() - total_start
+            logger.info(
+                "Orchestrator timings: setup=%.3f, llm_tool_select=%.3f, tool_exec=%.3f, post=%.3f, TOTAL=%.3f",
+                timings.get("setup", 0),
+                timings.get("llm_tool_selection", 0),
+                timings.get("tool_execution", 0),
+                timings.get("post_answering", 0),
+                timings.get("total", 0),
+            )
         else:
             logger.info("No function call detected")
             answer = Answer(

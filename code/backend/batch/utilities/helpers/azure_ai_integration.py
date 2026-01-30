@@ -220,10 +220,13 @@ class SemanticCache:
             # Fall back to exact match
             key = hashlib.md5(question.lower().strip().encode()).hexdigest()
             if key in self._cache:
-                sql, timestamp, _ = self._cache[key]
-                if time.time() - timestamp < self._ttl:
-                    logger.info("Semantic cache HIT (fallback exact match)")
-                    return sql
+                cached_entry = self._cache[key]
+                # Handle both 3-tuple and 4-tuple formats for backward compatibility
+                if len(cached_entry) >= 2:
+                    sql, timestamp = cached_entry[0], cached_entry[1]
+                    if time.time() - timestamp < self._ttl:
+                        logger.info("Semantic cache HIT (fallback exact match)")
+                        return sql
             return None
 
         # Search for similar cached questions

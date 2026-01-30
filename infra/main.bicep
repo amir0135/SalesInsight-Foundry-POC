@@ -1414,6 +1414,13 @@ module adminweb 'modules/app/adminweb.bicep' = {
         MANAGED_IDENTITY_CLIENT_ID: managedIdentityModule.outputs.clientId
         MANAGED_IDENTITY_RESOURCE_ID: managedIdentityModule.outputs.resourceId
         APP_ENV: appEnvironment
+        // Trackman/Redshift Integration
+        USE_REDSHIFT: useRedshift ? 'true' : 'false'
+        REDSHIFT_HOST: useRedshift ? redshiftHost : ''
+        REDSHIFT_PORT: useRedshift ? redshiftPort : ''
+        REDSHIFT_DB: useRedshift ? redshiftDatabase : ''
+        REDSHIFT_USER: useRedshift ? redshiftUser : ''
+        REDSHIFT_PASSWORD: useRedshift ? redshiftPassword : ''
       },
       databaseType == 'CosmosDB'
         ? {
@@ -1513,6 +1520,13 @@ module function 'modules/app/function.bicep' = {
         AZURE_CLIENT_ID: managedIdentityModule.outputs.clientId // Required so LangChain AzureSearch vector store authenticates with this user-assigned managed identity
         APP_ENV: appEnvironment
         BACKEND_URL: backendUrl
+        // Trackman/Redshift Integration
+        USE_REDSHIFT: useRedshift ? 'true' : 'false'
+        REDSHIFT_HOST: useRedshift ? redshiftHost : ''
+        REDSHIFT_PORT: useRedshift ? redshiftPort : ''
+        REDSHIFT_DB: useRedshift ? redshiftDatabase : ''
+        REDSHIFT_USER: useRedshift ? redshiftUser : ''
+        REDSHIFT_PASSWORD: useRedshift ? redshiftPassword : ''
       },
       databaseType == 'CosmosDB'
         ? {

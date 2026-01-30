@@ -206,7 +206,8 @@ class TrackmanNLQueryTool:
                 {"role": "user", "content": question},
             ]
 
-            response = self.llm_helper.get_chat_completion(messages)
+            # Use fast model for SQL generation (simpler task, faster response)
+            response = self.llm_helper.get_fast_chat_completion(messages, max_tokens=500)
             generated_sql = response.choices[0].message.content.strip()
 
             # Clean up markdown code blocks if present
@@ -264,9 +265,17 @@ class TrackmanNLQueryTool:
         Returns:
             Answer object with query results
         """
+        import time as timing_module
+
+        total_start = timing_module.perf_counter()
+        timings = {}
+
         try:
             # Step 0: Content Safety check for SQL injection attempts
+            step_start = timing_module.perf_counter()
             is_safe, safety_reason = self.content_safety.check_input(question)
+            timings["content_safety"] = timing_module.perf_counter() - step_start
+
             if not is_safe:
                 logger.warning(f"Content safety blocked input: {safety_reason}")
                 return Answer(
@@ -279,7 +288,10 @@ class TrackmanNLQueryTool:
                 )
 
             # Step 1: Generate SQL from question
+            step_start = timing_module.perf_counter()
             sql_result = self.generate_sql_from_question(question)
+            timings["sql_generation"] = timing_module.perf_counter() - step_start
+            timings["sql_cached"] = sql_result.get("cached", False)
 
             if not sql_result["success"]:
                 return Answer(
@@ -293,7 +305,9 @@ class TrackmanNLQueryTool:
             generated_sql = sql_result["sql"]
 
             # Step 2: Validate the generated SQL
+            step_start = timing_module.perf_counter()
             is_valid, error_message = validate_generated_sql(generated_sql)
+            timings["sql_validation"] = timing_module.perf_counter() - step_start
 
             if not is_valid:
                 return Answer(
@@ -309,11 +323,30 @@ class TrackmanNLQueryTool:
             generated_sql = add_limit_if_missing(generated_sql, max_rows)
 
             # Step 4: Execute the query
+            step_start = timing_module.perf_counter()
             data_source = get_data_source()
             result = data_source.execute_custom_query(generated_sql)
+            timings["db_execution"] = timing_module.perf_counter() - step_start
 
             # Step 5: Format the result
+            step_start = timing_module.perf_counter()
             answer_text = self._format_result(result, question)
+            timings["formatting"] = timing_module.perf_counter() - step_start
+
+            timings["total"] = timing_module.perf_counter() - total_start
+
+            # Log timing breakdown
+            logger.info(
+                "Query timings (seconds): content_safety=%.3f, sql_gen=%.3f (cached=%s), "
+                "validation=%.3f, db_exec=%.3f, format=%.3f, TOTAL=%.3f",
+                timings.get("content_safety", 0),
+                timings.get("sql_generation", 0),
+                timings.get("sql_cached", False),
+                timings.get("sql_validation", 0),
+                timings.get("db_execution", 0),
+                timings.get("formatting", 0),
+                timings.get("total", 0),
+            )
 
             return Answer(
                 question=question,

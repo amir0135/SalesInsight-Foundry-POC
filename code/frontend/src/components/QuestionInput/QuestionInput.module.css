@@ -101,3 +101,110 @@
         color: WindowText;
     }
 }
+
+/* Command autocomplete menu */
+.commandMenu {
+    position: absolute;
+    bottom: 100%;
+    left: 12px;
+    right: 12px;
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
+    margin-bottom: 8px;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.commandMenuHeader {
+    padding: 8px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #f0f0f0;
+    background: #fafafa;
+}
+
+.commandMenuItem {
+    padding: 12px 16px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.commandMenuItem:hover {
+    background-color: #f5f5f5;
+}
+
+.commandMenuItemSelected {
+    background-color: #e6f2ff;
+}
+
+.commandMenuItemSelected:hover {
+    background-color: #d9ebff;
+}
+
+.commandName {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: #0078d4;
+    margin-bottom: 4px;
+}
+
+.commandDescription {
+    font-size: 13px;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.commandExample {
+    font-size: 11px;
+    color: #888;
+    font-style: italic;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+.commandMenuFooter {
+    padding: 8px 12px;
+    font-size: 11px;
+    color: #888;
+    border-top: 1px solid #f0f0f0;
+    background: #fafafa;
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.commandMenuFooter kbd {
+    background: #e8e8e8;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 10px;
+    font-family: inherit;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
+}
+
+/* Database mode indicator */
+.databaseModeIndicator {
+    position: absolute;
+    top: -28px;
+    left: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 4px 4px 0 0;
+    box-shadow: 0 -2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.databaseIcon {
+    font-size: 14px;
+}
