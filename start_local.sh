@@ -67,6 +67,69 @@ if [ ! -f ".env" ]; then
 fi
 
 # =============================================================================
+# Azure Credentials Refresh
+# =============================================================================
+# Refreshes Azure CLI token to ensure Cosmos DB and other Azure services work.
+# Tokens expire daily, so this runs on every startup unless --skip-azure is used.
+
+refresh_azure_credentials() {
+    echo -e "${BLUE}[Azure] Checking Azure credentials...${NC}"
+
+    # Check if using RBAC authentication
+    AUTH_TYPE=$(grep -E "^AZURE_AUTH_TYPE=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || echo "keys")
+
+    if [ "$AUTH_TYPE" != "rbac" ]; then
+        echo -e "${GREEN}  ✓ Using key-based auth, no token refresh needed${NC}"
+        return 0
+    fi
+
+    # Check if az CLI is installed
+    if ! command -v az &> /dev/null; then
+        echo -e "${YELLOW}⚠ Azure CLI not installed. RBAC auth may fail.${NC}"
+        return 0
+    fi
+
+    # Check if logged in and token is valid
+    if ! az account get-access-token --query "expiresOn" -o tsv > /dev/null 2>&1; then
+        echo -e "${YELLOW}  Azure token expired or not logged in. Refreshing...${NC}"
+
+        # Try to refresh silently first (works if session is still valid)
+        if az account get-access-token --resource https://cosmos.azure.com > /dev/null 2>&1; then
+            echo -e "${GREEN}  ✓ Azure token refreshed${NC}"
+        else
+            echo -e "${YELLOW}  Opening browser for Azure login...${NC}"
+            if az login --only-show-errors > /dev/null 2>&1; then
+                echo -e "${GREEN}  ✓ Azure login successful${NC}"
+            else
+                echo -e "${RED}✗ Azure login failed. Cosmos DB access may not work.${NC}"
+                echo -e "${YELLOW}  Run 'az login' manually if needed.${NC}"
+            fi
+        fi
+    else
+        # Token exists, verify it's not about to expire (within 5 minutes)
+        EXPIRES_ON=$(az account get-access-token --query "expiresOn" -o tsv 2>/dev/null || echo "")
+        if [ -n "$EXPIRES_ON" ]; then
+            # macOS date command
+            EXPIRES_EPOCH=$(date -j -f "%Y-%m-%d %H:%M:%S" "${EXPIRES_ON%.*}" "+%s" 2>/dev/null || echo "0")
+            NOW_EPOCH=$(date "+%s")
+            REMAINING=$((EXPIRES_EPOCH - NOW_EPOCH))
+
+            if [ "$REMAINING" -lt 300 ] 2>/dev/null; then
+                echo -e "${YELLOW}  Token expiring soon, refreshing...${NC}"
+                az account get-access-token --resource https://management.azure.com > /dev/null 2>&1 || true
+            fi
+            echo -e "${GREEN}  ✓ Azure credentials valid${NC}"
+        else
+            echo -e "${GREEN}  ✓ Azure credentials valid${NC}"
+        fi
+    fi
+}
+
+if [ "$SKIP_AZURE" = false ]; then
+    refresh_azure_credentials
+fi
+
+# =============================================================================
 # Python Environment Setup
 # =============================================================================
 # Ensures venv exists and all dependencies are installed - works on any computer
@@ -290,7 +353,7 @@ configure_azure_storage() {
 
     if [ -z "$RESOURCE_GROUP" ]; then
         echo -e "${YELLOW}⚠ AZURE_RESOURCE_GROUP not found. Trying to auto-detect...${NC}"
-        RESOURCE_GROUP=$(az storage account show --name "$STORAGE_ACCOUNT" --query "resourceGroup" -o tsv 2>/dev/null || true)
+        RESOURCE_GROUP=$(timeout 15 az storage account show --name "$STORAGE_ACCOUNT" --query "resourceGroup" -o tsv 2>/dev/null || true)
     fi
 
     if [ -z "$RESOURCE_GROUP" ]; then
@@ -303,7 +366,7 @@ configure_azure_storage() {
 
     # 1. Enable public network access on storage account
     echo -e "${YELLOW}  Enabling public network access on storage account...${NC}"
-    az storage account update \
+    timeout 30 az storage account update \
         --name "$STORAGE_ACCOUNT" \
         --resource-group "$RESOURCE_GROUP" \
         --public-network-access Enabled \
@@ -314,17 +377,17 @@ configure_azure_storage() {
 
     # 2. Ensure current user has Storage Blob Data Contributor role
     echo -e "${YELLOW}  Checking Storage Blob role assignments...${NC}"
-    CURRENT_USER_ID=$(az ad signed-in-user show --query id -o tsv 2>/dev/null || true)
+    CURRENT_USER_ID=$(timeout 15 az ad signed-in-user show --query id -o tsv 2>/dev/null || true)
 
     if [ -n "$CURRENT_USER_ID" ]; then
-        STORAGE_ACCOUNT_ID=$(az storage account show \
+        STORAGE_ACCOUNT_ID=$(timeout 15 az storage account show \
             --name "$STORAGE_ACCOUNT" \
             --resource-group "$RESOURCE_GROUP" \
             --query id -o tsv 2>/dev/null || true)
 
         if [ -n "$STORAGE_ACCOUNT_ID" ]; then
             # Check if role is already assigned
-            EXISTING_ROLE=$(az role assignment list \
+            EXISTING_ROLE=$(timeout 30 az role assignment list \
                 --assignee "$CURRENT_USER_ID" \
                 --scope "$STORAGE_ACCOUNT_ID" \
                 --role "Storage Blob Data Contributor" \
@@ -332,7 +395,7 @@ configure_azure_storage() {
 
             if [ -z "$EXISTING_ROLE" ]; then
                 echo -e "${YELLOW}  Assigning Storage Blob Data Contributor role...${NC}"
-                az role assignment create \
+                timeout 30 az role assignment create \
                     --assignee "$CURRENT_USER_ID" \
                     --role "Storage Blob Data Contributor" \
                     --scope "$STORAGE_ACCOUNT_ID" \
@@ -344,7 +407,7 @@ configure_azure_storage() {
             fi
 
             # Also ensure Storage Blob Delegator role for SAS token generation
-            DELEGATOR_ROLE=$(az role assignment list \
+            DELEGATOR_ROLE=$(timeout 30 az role assignment list \
                 --assignee "$CURRENT_USER_ID" \
                 --scope "$STORAGE_ACCOUNT_ID" \
                 --role "Storage Blob Delegator" \
@@ -352,7 +415,7 @@ configure_azure_storage() {
 
             if [ -z "$DELEGATOR_ROLE" ]; then
                 echo -e "${YELLOW}  Assigning Storage Blob Delegator role...${NC}"
-                az role assignment create \
+                timeout 30 az role assignment create \
                     --assignee "$CURRENT_USER_ID" \
                     --role "Storage Blob Delegator" \
                     --scope "$STORAGE_ACCOUNT_ID" \
@@ -369,7 +432,7 @@ configure_azure_storage() {
 
     # 3. Allow blob public access (if required by policies)
     echo -e "${YELLOW}  Configuring blob public access settings...${NC}"
-    az storage account update \
+    timeout 30 az storage account update \
         --name "$STORAGE_ACCOUNT" \
         --resource-group "$RESOURCE_GROUP" \
         --allow-blob-public-access true \
@@ -381,12 +444,119 @@ configure_azure_storage() {
     echo ""
 }
 
+# Configure Cosmos DB RBAC permissions
+configure_cosmos_db() {
+    echo -e "${BLUE}[Azure] Configuring Cosmos DB for local development...${NC}"
+
+    # Check if using Cosmos DB
+    DATABASE_TYPE=$(grep -E "^DATABASE_TYPE=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || echo "CosmosDB")
+    if [ "$DATABASE_TYPE" != "CosmosDB" ]; then
+        echo -e "${YELLOW}  Skipping - DATABASE_TYPE is $DATABASE_TYPE, not CosmosDB${NC}"
+        return 0
+    fi
+
+    # Get Cosmos DB account name from .env
+    COSMOS_ACCOUNT=$(grep -E "^AZURE_COSMOSDB_ACCOUNT_NAME=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || true)
+
+    if [ -z "$COSMOS_ACCOUNT" ]; then
+        echo -e "${YELLOW}⚠ AZURE_COSMOSDB_ACCOUNT_NAME not found in .env. Skipping Cosmos DB configuration.${NC}"
+        return 0
+    fi
+
+    # Get resource group from .env or auto-detect
+    RESOURCE_GROUP=$(grep -E "^AZURE_RESOURCE_GROUP=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || true)
+    if [ -z "$RESOURCE_GROUP" ]; then
+        RESOURCE_GROUP=$(timeout 15 az cosmosdb show --name "$COSMOS_ACCOUNT" --query "resourceGroup" -o tsv 2>/dev/null || true)
+    fi
+
+    if [ -z "$RESOURCE_GROUP" ]; then
+        echo -e "${YELLOW}⚠ Could not determine resource group. Skipping Cosmos DB configuration.${NC}"
+        return 0
+    fi
+
+    echo -e "${BLUE}  Cosmos DB Account: $COSMOS_ACCOUNT${NC}"
+    echo -e "${BLUE}  Resource Group: $RESOURCE_GROUP${NC}"
+
+    # Enable public network access on Cosmos DB (policies may disable this daily)
+    echo -e "${YELLOW}  Enabling public network access on Cosmos DB...${NC}"
+    for attempt in 1 2 3; do
+        if timeout 90 az cosmosdb update \
+            --name "$COSMOS_ACCOUNT" \
+            --resource-group "$RESOURCE_GROUP" \
+            --public-network-access ENABLED \
+            --output none 2>/dev/null; then
+            echo -e "${GREEN}  ✓ Public network access enabled${NC}"
+            break
+        else
+            if [ $attempt -lt 3 ]; then
+                echo -e "${YELLOW}  ⚠ Retry $attempt/3 - waiting for Cosmos DB lock...${NC}"
+                sleep 15
+            else
+                echo -e "${YELLOW}  ⚠ Could not enable public access (may need manual action in Azure Portal)${NC}"
+            fi
+        fi
+    done
+
+    # Get current user ID
+    CURRENT_USER_ID=$(timeout 15 az ad signed-in-user show --query id -o tsv 2>/dev/null || true)
+
+    if [ -z "$CURRENT_USER_ID" ]; then
+        echo -e "${YELLOW}  ⚠ Could not get current user ID. Skipping Cosmos DB role assignments.${NC}"
+        return 0
+    fi
+
+    # Get Cosmos DB account ID
+    COSMOS_ACCOUNT_ID=$(timeout 15 az cosmosdb show \
+        --name "$COSMOS_ACCOUNT" \
+        --resource-group "$RESOURCE_GROUP" \
+        --query id -o tsv 2>/dev/null || true)
+
+    if [ -z "$COSMOS_ACCOUNT_ID" ]; then
+        echo -e "${YELLOW}  ⚠ Could not get Cosmos DB account ID. Skipping role assignments.${NC}"
+        return 0
+    fi
+
+    # Assign Cosmos DB Built-in Data Contributor role (allows full data plane access)
+    # Role ID: 00000000-0000-0000-0000-000000000002
+    echo -e "${YELLOW}  Checking Cosmos DB RBAC role assignments...${NC}"
+
+    # Check if role is already assigned using SQL role assignments
+    EXISTING_ROLE=$(timeout 30 az cosmosdb sql role assignment list \
+        --account-name "$COSMOS_ACCOUNT" \
+        --resource-group "$RESOURCE_GROUP" \
+        --query "[?principalId=='$CURRENT_USER_ID'].id" -o tsv 2>/dev/null || true)
+
+    if [ -z "$EXISTING_ROLE" ]; then
+        echo -e "${YELLOW}  Assigning Cosmos DB Built-in Data Contributor role...${NC}"
+
+        # Get subscription ID
+        SUB_ID=$(timeout 10 az account show --query id -o tsv 2>/dev/null || true)
+
+        # Create SQL role assignment for data access
+        timeout 60 az cosmosdb sql role assignment create \
+            --account-name "$COSMOS_ACCOUNT" \
+            --resource-group "$RESOURCE_GROUP" \
+            --role-definition-id "/subscriptions/$SUB_ID/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.DocumentDB/databaseAccounts/$COSMOS_ACCOUNT/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002" \
+            --principal-id "$CURRENT_USER_ID" \
+            --scope "/" \
+            --output none 2>/dev/null && \
+            echo -e "${GREEN}  ✓ Cosmos DB Data Contributor role assigned${NC}" || \
+            echo -e "${YELLOW}  ⚠ Could not assign Cosmos DB role (may already exist or require elevated permissions)${NC}"
+    else
+        echo -e "${GREEN}  ✓ Cosmos DB Data Contributor role already assigned${NC}"
+    fi
+
+    echo -e "${GREEN}✓ Cosmos DB configuration complete${NC}"
+    echo ""
+}
+
 # Run Azure configuration (unless --skip-azure flag is passed)
 if [ "$SKIP_AZURE" = true ]; then
-    echo -e "${YELLOW}[Azure] Skipping Azure Storage configuration (--skip-azure flag)${NC}"
+    echo -e "${YELLOW}[Azure] Skipping Azure configuration (--skip-azure flag)${NC}"
     echo ""
 else
     configure_azure_storage
+    configure_cosmos_db
 fi
 
 # Check if PostgreSQL container is running (for TrackMan/Redshift testing)

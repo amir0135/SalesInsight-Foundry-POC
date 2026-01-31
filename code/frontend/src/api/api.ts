@@ -23,8 +23,15 @@ export async function callConversationApi(
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(JSON.stringify(errorData.error));
+    let errorMessage = `Server error (${response.status})`;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData?.error ? JSON.stringify(errorData.error) : errorMessage;
+    } catch {
+      // Response body was empty or not valid JSON
+      errorMessage = `Server error (${response.status}): ${response.statusText || 'Unable to connect to backend service'}`;
+    }
+    throw new Error(errorMessage);
   }
 
   return response;
@@ -106,10 +113,17 @@ export const historyRead = async (convId: string): Promise<ChatMessage[]> => {
     },
   })
     .then(async (res) => {
-      if (!res) {
+      if (!res || !res.ok) {
+        console.error(`History read failed with status ${res?.status}`);
         return [];
       }
-      const payload = await res.json();
+      let payload;
+      try {
+        payload = await res.json();
+      } catch {
+        console.error("Failed to parse history read response");
+        return [];
+      }
       const messages: ChatMessage[] = [];
       if (payload?.messages) {
         payload.messages.forEach((msg: any) => {
@@ -139,7 +153,17 @@ export const historyList = async (
     method: "GET",
   })
     .then(async (res) => {
-      let payload = await res.json();
+      if (!res.ok) {
+        console.error(`History list failed with status ${res.status}`);
+        return null;
+      }
+      let payload;
+      try {
+        payload = await res.json();
+      } catch {
+        console.error("Failed to parse history response");
+        return null;
+      }
       if (!Array.isArray(payload)) {
         console.error("There was an issue fetching your data.");
         return null;
