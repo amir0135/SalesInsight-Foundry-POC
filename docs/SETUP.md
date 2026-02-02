@@ -1,103 +1,145 @@
 # Local Development Setup Guide
 
-This guide explains how to set up the **Chat With Your Data** solution accelerator with **Database integration** for local development.
+This guide explains how to set up the **Chat With Your Data** solution accelerator for local development.
 
-## Quick Start
+---
 
-### Option 1: Deploy to Azure First (Recommended)
+## 🚀 Quick Start (Choose One)
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/amir0135/chat-with-your-data.git
-   cd chat-with-your-data
-   ```
+### Option 1: Docker (Easiest - 5 minutes)
 
-2. **Deploy to Azure** (provisions all required resources)
-   ```bash
-   azd auth login
-   azd up
-   ```
+**Prerequisites:** Only [Docker Desktop](https://www.docker.com/products/docker-desktop) required.
 
-   Or use the "Deploy to Azure" button in the README.
+```bash
+# 1. Clone the repository
+git clone https://github.com/amir0135/chat-with-your-data.git
+cd chat-with-your-data
 
-3. **Run the local setup script** (pulls config from your Azure deployment)
-   ```bash
-   ./scripts/setup_local.sh
-   ```
+# 2. Create your config file
+cp .env.example .env
 
-4. **Start all services**
-   ```bash
-   ./start_local.sh
-   ```
+# 3. Edit .env with your Azure OpenAI and Search credentials
+#    (Only need: AZURE_OPENAI_*, AZURE_SEARCH_*, AZURE_BLOB_*)
 
-5. **Open the applications**
-   - Chat UI: http://localhost:5173
-   - Admin UI: http://localhost:8501
+# 4. Start everything
+docker-compose -f docker/docker-compose.local.yml up --build
 
-### Option 2: Manual Setup
+# 5. Open the app
+#    Chat UI: http://localhost:8080
+#    Admin UI: http://localhost:8501
+```
 
-If you prefer manual configuration:
+To stop: `docker-compose -f docker/docker-compose.local.yml down`
 
-1. **Install prerequisites**
-   - [Azure CLI](https://docs.microsoft.com/cli/azure/install-azure-cli)
-   - [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd)
-   - [Docker Desktop](https://www.docker.com/products/docker-desktop)
-   - [Node.js 18+](https://nodejs.org)
-   - [Python 3.11+](https://www.python.org)
-   - [Poetry](https://python-poetry.org/docs/#installation)
+---
 
-2. **Install Azure Functions Core Tools**
-   ```bash
-   npm install -g azure-functions-core-tools@4
-   ```
+### Option 2: Full Development Setup (Recommended for developers)
 
-3. **Install dependencies**
-   ```bash
-   poetry install
-   cd code/frontend && npm install && cd ../..
-   ```
+**Prerequisites:** Run the installer to get all required tools:
 
-4. **Configure environment**
-   ```bash
-   cp .env.sample .env
-   # Edit .env with your Azure resource values
-   ```
+```bash
+# Clone first
+git clone https://github.com/amir0135/chat-with-your-data.git
+cd chat-with-your-data
 
-5. **Start services**
-   ```bash
-   ./start_local.sh
-   ```
+# Install all prerequisites (macOS/Linux)
+./scripts/install_prerequisites.sh
+```
 
-## Services Overview
+<details>
+<summary>Or install manually</summary>
+
+- [Azure CLI](https://docs.microsoft.com/cli/azure/install-azure-cli)
+- [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop)
+- [Node.js 20+](https://nodejs.org)
+- [Python 3.11+](https://www.python.org)
+- [Poetry](https://python-poetry.org/docs/#installation)
+- Azure Functions Core Tools: `npm install -g azure-functions-core-tools@4`
+
+</details>
+
+**Then deploy and configure:**
+
+```bash
+# 1. Login to Azure
+az login
+azd auth login
+
+# 2. Deploy to Azure (creates all required resources)
+azd up
+
+# 3. Configure local environment (pulls config from Azure)
+./scripts/setup_local.sh
+
+# 4. Start all services
+./start_local.sh
+
+# 5. Open the app
+#    Chat UI: http://localhost:5173
+#    Admin UI: http://localhost:8501
+```
+
+---
+
+### Option 3: Manual Setup (Advanced)
+
+If you already have Azure resources and want manual control:
+
+```bash
+# 1. Install dependencies
+poetry install
+cd code/frontend && npm install && cd ../..
+
+# 2. Configure environment
+cp .env.example .env
+# Edit .env with your Azure resource values
+
+# 3. Start services
+./start_local.sh
+```
+
+---
+
+## 📋 Services Overview
 
 | Service | Port | URL | Description |
 |---------|------|-----|-------------|
-| Chat UI | 5173 | http://localhost:5173 | React frontend for chatting |
+| Chat UI | 5173 (dev) / 8080 (docker) | http://localhost:5173 | React frontend for chatting |
 | Chat API | 5050 | http://localhost:5050 | Flask backend API |
 | Admin UI | 8501 | http://localhost:8501 | Streamlit for document ingestion |
 | Azure Functions | 7071 | http://localhost:7071 | Background document processing |
-| PostgreSQL | 5432 | localhost:5432 | Database test database |
+| PostgreSQL | 5432 | localhost:5432 | Local database for testing |
+
+---
+
+## 📊 Data Visualization
+
+Query results are automatically analyzed and displayed as charts:
+
+| Chart Type | Use Case | Example |
+|------------|----------|---------|
+| **Bar** | Compare values across categories | Errors by facility |
+| **Line** | Trends over time | Daily error counts |
+| **Pie** | Proportional breakdowns | Error type distribution |
+| **Area** | Cumulative time-series | Sessions over time |
+
+Charts appear above data tables with a type selector to switch between views.
+
+---
+
+---
 
 ## Database Integration
 
-This fork includes **Database data integration** for querying operational data via natural language.
+This includes **database integration** for querying operational data via natural language.
 
 ### Features
 - Natural language to SQL conversion
 - Query errors, connectivity, sessions, and facility data
 - Smart schema retrieval (only loads relevant tables)
-- **Data visualization** - automatically generates bar charts, line graphs, pie charts, and area charts based on query results
+- **Data visualization** - automatically generates charts based on query results
 - Works with PostgreSQL (local) or AWS Redshift (production)
-
-### Data Visualization
-
-Query results are automatically analyzed to determine the best chart type:
-- **Bar charts** - for comparing values across categories (e.g., errors by facility)
-- **Line charts** - for trends over time (e.g., daily error counts)
-- **Pie charts** - for proportional breakdowns (e.g., error type distribution)
-- **Area charts** - for cumulative time-series data
-
-Charts appear above the data table and can be toggled on/off.
 
 ### Example Queries
 - "How many total errors occurred in the last 7 days?"
