@@ -10,6 +10,7 @@ import supersub from "remark-supersub";
 import pauseIcon from "../../assets/pauseIcon.svg";
 import speakerIcon from "../../assets/speakerIcon.svg";
 import * as sdk from "microsoft-cognitiveservices-speech-sdk";
+import { DataChart } from "../DataChart";
 
 import * as SpeechSDK from "microsoft-cognitiveservices-speech-sdk";
 
@@ -303,6 +304,9 @@ export const Answer = ({
       >
         <Stack.Item grow>
           <div className={styles.answerText}>
+            {parsedAnswer.visualization && (
+              <DataChart visualization={parsedAnswer.visualization} />
+            )}
             <ReactMarkdown
               remarkPlugins={[remarkGfm, supersub]}
               children={parsedAnswer.markdownFormatText}

@@ -365,7 +365,10 @@ class TrackmanNLQueryTool:
             )
 
     def _format_result(self, result: Dict, question: str) -> str:
-        """Format query result as markdown table."""
+        """Format query result as markdown table with optional visualization."""
+        import json
+        from ..helpers.trackman.visualization_helper import analyze_data_for_visualization
+
         columns = result.get("columns", [])
         rows = result.get("rows", [])
         metadata = result.get("metadata", {})
@@ -373,13 +376,25 @@ class TrackmanNLQueryTool:
         if not rows:
             return "No data found for your query."
 
-        # Build markdown table
+        # Generate visualization config if data is suitable for charting
+        viz_config = analyze_data_for_visualization(columns, rows, question)
+
+        # Build response
         lines = [
             f"**Query Results** | Source: {metadata.get('source', 'unknown')} | Rows: {len(rows)}",
             "",
+        ]
+
+        # Add visualization JSON block if chart is appropriate
+        if viz_config:
+            lines.append(f"```visualization\n{json.dumps(viz_config)}\n```")
+            lines.append("")
+
+        # Build markdown table
+        lines.extend([
             "| " + " | ".join(str(col) for col in columns) + " |",
             "| " + " | ".join("---" for _ in columns) + " |",
-        ]
+        ])
 
         for row in rows[:50]:  # Limit display rows
             formatted_row = []

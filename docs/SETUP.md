@@ -86,7 +86,18 @@ This fork includes **TrackMan data integration** for querying operational data v
 - Natural language to SQL conversion
 - Query errors, connectivity, sessions, and facility data
 - Smart schema retrieval (only loads relevant tables)
+- **Data visualization** - automatically generates bar charts, line graphs, pie charts, and area charts based on query results
 - Works with PostgreSQL (local) or AWS Redshift (production)
+
+### Data Visualization
+
+Query results are automatically analyzed to determine the best chart type:
+- **Bar charts** - for comparing values across categories (e.g., errors by facility)
+- **Line charts** - for trends over time (e.g., daily error counts)
+- **Pie charts** - for proportional breakdowns (e.g., error type distribution)
+- **Area charts** - for cumulative time-series data
+
+Charts appear above the data table and can be toggled on/off.
 
 ### Example Queries
 - "How many total errors occurred in the last 7 days?"
