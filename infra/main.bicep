@@ -151,26 +151,26 @@ param useAdvancedImageProcessing bool = false
 param advancedImageProcessingMaxImages int = 1
 
 // =============================================
-// Trackman/Redshift Integration Parameters
+// Database/Redshift Integration Parameters
 // =============================================
-@description('Optional. Whether to enable Trackman database integration for operational data queries.')
+@description('Optional. Whether to enable Database database integration for operational data queries.')
 param useRedshift bool = false
 
-@description('Optional. Redshift/PostgreSQL host for Trackman data.')
+@description('Optional. Redshift/PostgreSQL host for Database data.')
 @secure()
 param redshiftHost string = ''
 
-@description('Optional. Redshift/PostgreSQL port for Trackman data.')
+@description('Optional. Redshift/PostgreSQL port for Database data.')
 param redshiftPort string = '5439'
 
-@description('Optional. Redshift/PostgreSQL database name for Trackman data.')
+@description('Optional. Redshift/PostgreSQL database name for Database data.')
 param redshiftDatabase string = ''
 
-@description('Optional. Redshift/PostgreSQL user for Trackman data.')
+@description('Optional. Redshift/PostgreSQL user for Database data.')
 @secure()
 param redshiftUser string = ''
 
-@description('Optional. Redshift/PostgreSQL password for Trackman data.')
+@description('Optional. Redshift/PostgreSQL password for Database data.')
 @secure()
 param redshiftPassword string = ''
 
@@ -1309,7 +1309,7 @@ module web 'modules/app/web.bicep' = {
         MANAGED_IDENTITY_RESOURCE_ID: managedIdentityModule.outputs.resourceId
         AZURE_CLIENT_ID: managedIdentityModule.outputs.clientId // Required so LangChain AzureSearch vector store authenticates with this user-assigned managed identity
         APP_ENV: appEnvironment
-        // Trackman/Redshift Integration
+        // Database/Redshift Integration
         USE_REDSHIFT: useRedshift ? 'true' : 'false'
         REDSHIFT_HOST: useRedshift ? redshiftHost : ''
         REDSHIFT_PORT: useRedshift ? redshiftPort : ''
@@ -1414,7 +1414,7 @@ module adminweb 'modules/app/adminweb.bicep' = {
         MANAGED_IDENTITY_CLIENT_ID: managedIdentityModule.outputs.clientId
         MANAGED_IDENTITY_RESOURCE_ID: managedIdentityModule.outputs.resourceId
         APP_ENV: appEnvironment
-        // Trackman/Redshift Integration
+        // Database/Redshift Integration
         USE_REDSHIFT: useRedshift ? 'true' : 'false'
         REDSHIFT_HOST: useRedshift ? redshiftHost : ''
         REDSHIFT_PORT: useRedshift ? redshiftPort : ''
@@ -1520,7 +1520,7 @@ module function 'modules/app/function.bicep' = {
         AZURE_CLIENT_ID: managedIdentityModule.outputs.clientId // Required so LangChain AzureSearch vector store authenticates with this user-assigned managed identity
         APP_ENV: appEnvironment
         BACKEND_URL: backendUrl
-        // Trackman/Redshift Integration
+        // Database/Redshift Integration
         USE_REDSHIFT: useRedshift ? 'true' : 'false'
         REDSHIFT_HOST: useRedshift ? redshiftHost : ''
         REDSHIFT_PORT: useRedshift ? redshiftPort : ''

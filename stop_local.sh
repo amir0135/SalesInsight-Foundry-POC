@@ -22,7 +22,7 @@ lsof -ti:7071 | xargs kill -9 2>/dev/null && echo -e "${GREEN}✓${NC} Azure Fun
 
 echo ""
 echo -e "${YELLOW}Optional cleanup:${NC}"
-echo "  Stop PostgreSQL:  docker stop trackman-postgres"
-echo "  Remove container: docker rm trackman-postgres"
+echo "  Stop PostgreSQL:  docker stop database-postgres"
+echo "  Remove container: docker rm database-postgres"
 echo ""
 echo "Done."

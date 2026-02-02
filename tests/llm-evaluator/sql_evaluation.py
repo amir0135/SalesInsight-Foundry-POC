@@ -1,4 +1,4 @@
-"""SQL Query Quality Evaluation for Trackman NL-to-SQL.
+"""SQL Query Quality Evaluation for Database NL-to-SQL.
 
 This module provides evaluation metrics for measuring the quality of
 LLM-generated SQL queries using Azure AI Evaluation SDK.
@@ -32,12 +32,12 @@ sys.path.insert(
     0, str(pathlib.Path(__file__).parent.parent.parent / "code" / "backend")
 )
 
-from batch.utilities.helpers.trackman.redshift_config import (
+from batch.utilities.helpers.database.redshift_config import (
     ALLOWED_TABLES,
     TABLE_ALIASES,
     validate_generated_sql,
 )
-from batch.utilities.tools.trackman_nl_query_tool import TrackmanNLQueryTool
+from batch.utilities.tools.database_nl_query_tool import DatabaseNLQueryTool
 
 load_dotenv()
 
@@ -207,7 +207,7 @@ class SQLExecutionEvaluator:
 
         # Real execution mode
         try:
-            from batch.utilities.helpers.trackman.data_source_factory import (
+            from batch.utilities.helpers.database.data_source_factory import (
                 get_data_source,
             )
 
@@ -275,7 +275,7 @@ class SQLQueryEvaluationRunner:
         Returns:
             DataFrame with query, sql, and response columns
         """
-        tool = TrackmanNLQueryTool(use_semantic_cache=False)
+        tool = DatabaseNLQueryTool(use_semantic_cache=False)
         results = []
 
         for question in questions:

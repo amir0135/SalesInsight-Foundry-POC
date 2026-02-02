@@ -1,6 +1,6 @@
 """Configuration for Redshift/PostgreSQL table and column allowlists.
 
-This matches the actual Trackman data schema from CSV exports.
+This matches the actual Database data schema from CSV exports.
 """
 
 # Allowlist configuration matching actual CSV data
@@ -163,7 +163,7 @@ SCHEMA_DESCRIPTION = {
         },
     },
     "error_logs": {
-        "description": "System errors and alerts from Trackman devices",
+        "description": "System errors and alerts from Database devices",
         "common_uses": [
             "Error tracking",
             "System alerts",
@@ -284,7 +284,7 @@ def get_schema_for_prompt(question: str = None) -> str:
 
 
 # System prompt for SQL generation
-SQL_GENERATION_SYSTEM_PROMPT = """You are a SQL query generator for a Trackman data warehouse.
+SQL_GENERATION_SYSTEM_PROMPT = """You are a SQL query generator for a Database data warehouse.
 Your task is to convert natural language questions into valid PostgreSQL/Redshift SQL queries.
 
 {schema}

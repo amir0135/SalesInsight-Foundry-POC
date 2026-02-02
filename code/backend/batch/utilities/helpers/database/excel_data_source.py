@@ -1,4 +1,4 @@
-"""Excel-based Trackman data source implementation.
+"""Excel-based Database data source implementation.
 Scans data/testtrack directory for Excel files and merges data from all sheets."""
 
 import logging
@@ -9,13 +9,13 @@ from typing import Dict, Optional
 
 import pandas as pd
 
-from .data_source_interface import TrackmanDataSource
+from .data_source_interface import DatabaseDataSource
 
 logger = logging.getLogger(__name__)
 
 
-class ExcelDataSource(TrackmanDataSource):
-    """Excel-based implementation of Trackman data source.
+class ExcelDataSource(DatabaseDataSource):
+    """Excel-based implementation of Database data source.
 
     Scans a directory for all .xlsx and .xls files and merges data
     from matching sheets across all files.
@@ -26,12 +26,12 @@ class ExcelDataSource(TrackmanDataSource):
         Initialize Excel data source.
 
         Args:
-            data_dir: Directory containing Excel files. If None, uses TRACKMAN_DATA_DIR env var
+            data_dir: Directory containing Excel files. If None, uses DATABASE_DATA_DIR env var
                      or defaults to 'data/testtrack'. Will scan for all .xlsx files
                      and merge data from matching sheets.
         """
         if data_dir is None:
-            data_dir = os.getenv("TRACKMAN_DATA_DIR", "data/testtrack")
+            data_dir = os.getenv("DATABASE_DATA_DIR", "data/testtrack")
 
         self.data_dir = Path(data_dir)
         self._data = {}
@@ -40,7 +40,7 @@ class ExcelDataSource(TrackmanDataSource):
     def _load_data(self):
         """Load all sheets from all Excel files in directory and merge them."""
         try:
-            logger.info(f"Scanning for Trackman Excel files in: {self.data_dir}")
+            logger.info(f"Scanning for Database Excel files in: {self.data_dir}")
 
             if not self.data_dir.exists():
                 logger.warning(f"Data directory not found: {self.data_dir}")

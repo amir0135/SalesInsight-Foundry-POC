@@ -24,7 +24,7 @@ urlFragment: chat-with-your-data-solution-accelerator
 
 # Chat with your data - Solution accelerator
 
-> **🚀 Fork with TrackMan Integration**: This fork includes additional TrackMan/Redshift integration for querying operational data via natural language. See [TrackMan Integration](#trackman-integration) and [Local Setup Guide](docs/SETUP.md).
+> **🚀 Fork with Database Integration**: This fork includes additional Database/Redshift integration for querying operational data via natural language. See [Database Integration](#database-integration) and [Local Setup Guide](docs/SETUP.md).
 
  ##### Table of Contents
 - [Chat with your data - Solution accelerator](#chat-with-your-data---solution-accelerator)
@@ -243,9 +243,9 @@ When deploying the solution using the "Deploy to Azure" button, you'll see two f
 
 ---
 
-## TrackMan Integration
+## Database Integration
 
-This fork includes **TrackMan data integration** for querying operational data (errors, connectivity, sessions) via natural language.
+This fork includes **Database data integration** for querying operational data (errors, connectivity, sessions) via natural language.
 
 ### Features
 - 🗣️ **Natural Language to SQL**: Ask questions in plain English, get SQL results
@@ -261,7 +261,7 @@ This fork includes **TrackMan data integration** for querying operational data (
 "What's the average session duration this month?"
 ```
 
-### Local Development with TrackMan
+### Local Development with Database
 
 1. **Quick Setup** (after deploying to Azure):
    ```bash
@@ -271,22 +271,22 @@ This fork includes **TrackMan data integration** for querying operational data (
    ./start_local.sh            # Starts all services + PostgreSQL
    ```
 
-2. **Test TrackMan Queries**: Open http://localhost:5173 and ask database questions
+2. **Test Database Queries**: Open http://localhost:5173 and ask database questions
 
 See [docs/SETUP.md](docs/SETUP.md) for detailed setup instructions.
 
 ### Configuration
 
-TrackMan is enabled by default. Configure in `.env`:
+Database is enabled by default. Configure in `.env`:
 
 ```bash
-# Enable/disable TrackMan queries
+# Enable/disable Database queries
 USE_REDSHIFT=true
 
 # Local PostgreSQL (default for testing)
 REDSHIFT_HOST=localhost
 REDSHIFT_PORT=5432
-REDSHIFT_DB=trackman_test
+REDSHIFT_DB=database_test
 
 # Production Redshift
 # REDSHIFT_HOST=your-cluster.region.redshift.amazonaws.com

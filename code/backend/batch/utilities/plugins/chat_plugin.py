@@ -8,8 +8,8 @@ from ..tools.question_answer_tool import QuestionAnswerTool
 from ..tools.text_processing_tool import TextProcessingTool
 
 
-def _is_trackman_enabled() -> bool:
-    """Check if Trackman integration is enabled via USE_REDSHIFT env var."""
+def _is_database_enabled() -> bool:
+    """Check if Database integration is enabled via USE_REDSHIFT env var."""
     return os.getenv("USE_REDSHIFT", "false").lower() == "true"
 
 
@@ -19,9 +19,9 @@ class ChatPlugin:
     1. search_documents - RAG for uploaded docs
     2. text_processing - Text transformations
 
-    When USE_REDSHIFT=true, use TrackmanChatPlugin which adds:
-    3. query_trackman - All database queries (LLM-generated SQL)
-    4. analyze_trackman - Multi-step analysis
+    When USE_REDSHIFT=true, use DatabaseChatPlugin which adds:
+    3. query_database - All database queries (LLM-generated SQL)
+    4. analyze_database - Multi-step analysis
     """
 
     def __init__(self, question: str, chat_history: list[dict]) -> None:
@@ -60,28 +60,28 @@ class ChatPlugin:
         )
 
 
-class TrackmanChatPlugin(ChatPlugin):
+class DatabaseChatPlugin(ChatPlugin):
     """
-    Extended ChatPlugin with Trackman database integration.
+    Extended ChatPlugin with Database database integration.
     Only used when USE_REDSHIFT=true.
 
     Adds:
-    - query_trackman - Natural language SQL queries
-    - analyze_trackman - Multi-step facility analysis
+    - query_database - Natural language SQL queries
+    - analyze_database - Multi-step facility analysis
     """
 
     def __init__(self, question: str, chat_history: list[dict]) -> None:
         super().__init__(question, chat_history)
-        # Lazy import to avoid errors when Trackman tools aren't available
-        from ..tools.trackman_nl_query_tool import TrackmanNLQueryTool
-        from ..tools.trackman_analysis_tool import TrackmanAnalysisTool
+        # Lazy import to avoid errors when Database tools aren't available
+        from ..tools.database_nl_query_tool import DatabaseNLQueryTool
+        from ..tools.database_analysis_tool import DatabaseAnalysisTool
 
-        self._trackman_nl_tool = TrackmanNLQueryTool
-        self._trackman_analysis_tool = TrackmanAnalysisTool
+        self._database_nl_tool = DatabaseNLQueryTool
+        self._database_analysis_tool = DatabaseAnalysisTool
 
     @kernel_function(
         description=(
-            "Query the Trackman operational database. ALWAYS use this tool for questions about: "
+            "Query the Database operational database. ALWAYS use this tool for questions about: "
             "error_logs (errors, error messages, event_level, radar_model, radar_firmware, facility errors), "
             "connectivity_logs (disconnections, connections, speed_mbps, connection_type), "
             "facility_metadata (facilities, locations, usage), "
@@ -92,7 +92,7 @@ class TrackmanChatPlugin(ChatPlugin):
             "This tool generates SQL and returns actual database results."
         )
     )
-    def query_trackman(
+    def query_database(
         self,
         question: Annotated[
             str,
@@ -100,15 +100,15 @@ class TrackmanChatPlugin(ChatPlugin):
         ],
         max_rows: Annotated[int, "Maximum rows to return (default: 50, max: 100)"] = 50,
     ) -> Answer:
-        return self._trackman_nl_tool().query_with_natural_language(
+        return self._database_nl_tool().query_with_natural_language(
             question=question,
             max_rows=min(max_rows, 100),
         )
 
     @kernel_function(
-        description="Deep analysis of Trackman data. Use for: facility health assessment, comparing multiple facilities, trend analysis over time, or correlating errors with connectivity issues."
+        description="Deep analysis of Database data. Use for: facility health assessment, comparing multiple facilities, trend analysis over time, or correlating errors with connectivity issues."
     )
-    def analyze_trackman(
+    def analyze_database(
         self,
         analysis_type: Annotated[
             str,
@@ -128,7 +128,7 @@ class TrackmanChatPlugin(ChatPlugin):
         ] = "errors",
         range_days: Annotated[int, "Days to analyze (default: 30)"] = 30,
     ) -> Answer:
-        tool = self._trackman_analysis_tool()
+        tool = self._database_analysis_tool()
 
         if analysis_type == "facility_health":
             if not facility_id:
@@ -167,8 +167,8 @@ def get_chat_plugin(question: str, chat_history: list[dict]) -> ChatPlugin:
     """
     Factory function to get the appropriate ChatPlugin.
 
-    Returns TrackmanChatPlugin when USE_REDSHIFT=true, otherwise base ChatPlugin.
+    Returns DatabaseChatPlugin when USE_REDSHIFT=true, otherwise base ChatPlugin.
     """
-    if _is_trackman_enabled():
-        return TrackmanChatPlugin(question, chat_history)
+    if _is_database_enabled():
+        return DatabaseChatPlugin(question, chat_history)
     return ChatPlugin(question, chat_history)

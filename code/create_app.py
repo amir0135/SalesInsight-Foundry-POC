@@ -666,7 +666,7 @@ def create_app():
             return jsonify({"error": "Database integration not enabled"}), 400
 
         try:
-            from backend.batch.utilities.helpers.trackman.schema_discovery import (
+            from backend.batch.utilities.helpers.database.schema_discovery import (
                 discover_and_generate_schema,
             )
 
@@ -689,7 +689,7 @@ def create_app():
             return jsonify({"error": "Database integration not enabled"}), 400
 
         try:
-            from backend.batch.utilities.helpers.trackman.schema_loader import (
+            from backend.batch.utilities.helpers.database.schema_loader import (
                 get_allowed_tables,
                 get_table_description,
                 get_date_column,

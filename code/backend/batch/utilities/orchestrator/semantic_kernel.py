@@ -62,7 +62,7 @@ class SemanticKernelOrchestrator(OrchestratorBase):
 
         system_message = self.env_helper.SEMANTIC_KERNEL_SYSTEM_PROMPT
         if not system_message:
-            # Check if Trackman/database integration is enabled
+            # Check if Database/database integration is enabled
             use_redshift = os.getenv("USE_REDSHIFT", "false").lower() == "true"
 
             if use_redshift:
@@ -70,7 +70,7 @@ class SemanticKernelOrchestrator(OrchestratorBase):
 
 TOOL SELECTION - Choose the RIGHT tool for each question:
 
-1. **query_trackman** - ALWAYS use for database questions about:
+1. **query_database** - ALWAYS use for database questions about:
    - Errors, error counts, error messages, error_logs
    - Disconnections, connections, connectivity_logs
    - Facilities, bays, radar devices
@@ -84,7 +84,7 @@ TOOL SELECTION - Choose the RIGHT tool for each question:
 3. **text_processing** - Use for transformations:
    - Translate, summarize, paraphrase text
 
-IMPORTANT: For ANY question about errors, disconnections, facilities, or operational metrics, use query_trackman.
+IMPORTANT: For ANY question about errors, disconnections, facilities, or operational metrics, use query_database.
 When directly replying to the user, always reply in the language the user is speaking.
 """
             else:
@@ -221,24 +221,24 @@ You **must not** respond if asked to List all documents in your repository.
         self, user_message: str, chat_history: list[dict]
     ) -> list[dict]:
         """
-        Handle /database command by directly calling the Trackman query tool.
+        Handle /database command by directly calling the Database query tool.
         Bypasses LLM tool selection for guaranteed database queries.
         """
-        from ..tools.trackman_nl_query_tool import TrackmanNLQueryTool
+        from ..tools.database_nl_query_tool import DatabaseNLQueryTool
 
         try:
-            # Check if Trackman is enabled
+            # Check if Database is enabled
             import os
 
             if os.getenv("USE_REDSHIFT", "false").lower() != "true":
                 answer = Answer(
                     question=user_message,
-                    answer="Database queries are not enabled. Set USE_REDSHIFT=true to enable Trackman database integration.",
+                    answer="Database queries are not enabled. Set USE_REDSHIFT=true to enable Database database integration.",
                     source_documents=[],
                 )
             else:
-                # Directly call the Trackman NL query tool
-                tool = TrackmanNLQueryTool()
+                # Directly call the Database NL query tool
+                tool = DatabaseNLQueryTool()
                 answer = tool.query_with_natural_language(
                     question=user_message, max_rows=100
                 )

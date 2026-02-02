@@ -1,5 +1,5 @@
 """
-Dynamic schema configuration loader for Trackman.
+Dynamic schema configuration loader for Database.
 
 Loads table/column configuration from YAML file, making it easy to
 add new tables without touching Python code.

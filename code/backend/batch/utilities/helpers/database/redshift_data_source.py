@@ -1,4 +1,4 @@
-"""Redshift-based Trackman data source implementation."""
+"""Redshift-based Database data source implementation."""
 
 import logging
 import os
@@ -8,15 +8,15 @@ from typing import Dict, Optional, Any, List
 import psycopg2
 from psycopg2 import sql
 
-from .data_source_interface import TrackmanDataSource
+from .data_source_interface import DatabaseDataSource
 from .redshift_config import validate_table, ALLOWED_TABLES
 from ..azure_ai_integration import get_schema_cache, trace_operation
 
 logger = logging.getLogger(__name__)
 
 
-class RedshiftDataSource(TrackmanDataSource):
-    """Redshift-based implementation of Trackman data source."""
+class RedshiftDataSource(DatabaseDataSource):
+    """Redshift-based implementation of Database data source."""
 
     def __init__(self):
         """Initialize Redshift data source using environment variables."""

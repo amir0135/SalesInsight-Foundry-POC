@@ -3,7 +3,7 @@
 # Local Development Startup Script
 # =============================================================================
 # Starts all services: Chat UI (Flask + Vite), Admin UI (Streamlit),
-# Azure Functions, and PostgreSQL (for TrackMan testing)
+# Azure Functions, and PostgreSQL (for Database testing)
 #
 # Prerequisites:
 #   - Run ./scripts/setup_local.sh first (after azd up)
@@ -559,16 +559,16 @@ else
     configure_cosmos_db
 fi
 
-# Check if PostgreSQL container is running (for TrackMan/Redshift testing)
-if ! docker ps | grep -q trackman-postgres; then
-    echo -e "${YELLOW}Starting PostgreSQL container (for TrackMan testing)...${NC}"
+# Check if PostgreSQL container is running (for Database/Redshift testing)
+if ! docker ps | grep -q database-postgres; then
+    echo -e "${YELLOW}Starting PostgreSQL container (for Database testing)...${NC}"
     docker run -d \
-        --name trackman-postgres \
+        --name database-postgres \
         -e POSTGRES_USER=testuser \
         -e POSTGRES_PASSWORD=testpassword \
-        -e POSTGRES_DB=trackman_test \
+        -e POSTGRES_DB=database_test \
         -p 5432:5432 \
-        postgres:14 2>/dev/null || docker start trackman-postgres 2>/dev/null || true
+        postgres:14 2>/dev/null || docker start database-postgres 2>/dev/null || true
     # Don't wait here - PostgreSQL will be ready by the time we need it
 fi
 
@@ -580,11 +580,11 @@ echo -e "${YELLOW}Cleaning up existing processes...${NC}"
 (lsof -ti:7071 | xargs kill -9 2>/dev/null || true) &
 wait
 
-# Export environment variables for TrackMan/Redshift
+# Export environment variables for Database/Redshift
 export USE_REDSHIFT=true
 export REDSHIFT_HOST=localhost
 export REDSHIFT_PORT=5432
-export REDSHIFT_DB=trackman_test
+export REDSHIFT_DB=database_test
 export REDSHIFT_USER=testuser
 export REDSHIFT_PASSWORD=testpassword
 
@@ -647,7 +647,7 @@ echo -e "${GREEN}║${NC} Chat UI (Frontend):  ${BLUE}http://localhost:5173${NC}
 echo -e "${GREEN}║${NC} Chat API (Backend):  ${BLUE}http://localhost:5050${NC}                ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC} Admin UI:            ${BLUE}http://localhost:8501${NC}                ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC} Azure Functions:     ${BLUE}http://localhost:7071${NC}                ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC} PostgreSQL:          localhost:5432 (trackman_test)     ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC} PostgreSQL:          localhost:5432 (database_test)     ${GREEN}║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${YELLOW}Logs:${NC}"
@@ -661,7 +661,7 @@ echo ""
 echo -e "${BLUE}Usage:${NC}"
 echo "  • Chat UI: Open http://localhost:5173 to chat with your documents"
 echo "  • Admin UI: Open http://localhost:8501 to upload and process documents"
-echo "  • TrackMan: Ask database queries like 'Show errors from last 7 days'"
+echo "  • Database: Ask database queries like 'Show errors from last 7 days'"
 echo "  • /database <query>: Force direct database query (bypasses LLM)"
 echo ""
 echo -e "${BLUE}Startup Options:${NC}"

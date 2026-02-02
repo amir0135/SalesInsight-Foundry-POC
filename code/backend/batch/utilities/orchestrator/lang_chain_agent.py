@@ -137,21 +137,21 @@ class LangChainAgent(OrchestratorBase):
         self, user_message: str, chat_history: List[dict]
     ) -> list[dict]:
         """
-        Handle /database command by directly calling the Trackman query tool.
+        Handle /database command by directly calling the Database query tool.
         Bypasses agent tool selection for guaranteed database queries.
         """
         import os
-        from ..tools.trackman_nl_query_tool import TrackmanNLQueryTool
+        from ..tools.database_nl_query_tool import DatabaseNLQueryTool
 
         try:
             if os.getenv("USE_REDSHIFT", "false").lower() != "true":
                 answer = Answer(
                     question=user_message,
-                    answer="Database queries are not enabled. Set USE_REDSHIFT=true to enable Trackman database integration.",
+                    answer="Database queries are not enabled. Set USE_REDSHIFT=true to enable Database database integration.",
                     source_documents=[],
                 )
             else:
-                tool = TrackmanNLQueryTool()
+                tool = DatabaseNLQueryTool()
                 answer = tool.query_with_natural_language(
                     question=user_message, max_rows=100
                 )

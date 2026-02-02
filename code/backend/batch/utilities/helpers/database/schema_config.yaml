@@ -1,4 +1,4 @@
-# Trackman Schema Configuration
+# Database Schema Configuration
 # ================================
 # Add new tables and columns here. The system will automatically:
 # 1. Validate queries against this allowlist
@@ -30,7 +30,7 @@ tables:
       - message
       - facility
       - bay
-    description: "System errors and alerts from Trackman devices"
+    description: "System errors and alerts from Database devices"
     date_column: error_timestamp
     common_queries:
       - "Most common error messages"

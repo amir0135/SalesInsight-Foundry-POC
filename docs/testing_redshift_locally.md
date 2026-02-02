@@ -7,10 +7,10 @@ Since Amazon Redshift is based on PostgreSQL, you can test the integration local
 ### 1. Start PostgreSQL with Docker
 
 ```bash
-docker run --name trackman-postgres \
+docker run --name database-postgres \
   -e POSTGRES_PASSWORD=testpassword \
   -e POSTGRES_USER=testuser \
-  -e POSTGRES_DB=trackman_test \
+  -e POSTGRES_DB=database_test \
   -p 5432:5432 \
   -d postgres:14
 ```
@@ -19,7 +19,7 @@ docker run --name trackman-postgres \
 
 ```bash
 # Connect to the database
-docker exec -it trackman-postgres psql -U testuser -d trackman_test
+docker exec -it database-postgres psql -U testuser -d database_test
 ```
 
 Then run this SQL:
@@ -99,7 +99,7 @@ Update your `.env` file:
 USE_REDSHIFT=true
 REDSHIFT_HOST=localhost
 REDSHIFT_PORT=5432
-REDSHIFT_DB=trackman_test
+REDSHIFT_DB=database_test
 REDSHIFT_USER=testuser
 REDSHIFT_PASSWORD=testpassword
 REDSHIFT_SCHEMA=public
@@ -116,8 +116,8 @@ Restart your admin app and chat interface. You can now test queries like:
 
 When done testing:
 ```bash
-docker stop trackman-postgres
-docker rm trackman-postgres
+docker stop database-postgres
+docker rm database-postgres
 ```
 
 ## Option 2: Install PostgreSQL Locally
@@ -128,10 +128,10 @@ brew install postgresql@14
 brew services start postgresql@14
 
 # Create database
-createdb trackman_test
+createdb database_test
 
 # Connect and run the SQL above
-psql trackman_test
+psql database_test
 ```
 
 ### Linux (Ubuntu/Debian)
@@ -141,11 +141,11 @@ sudo apt-get install postgresql postgresql-contrib
 
 # Create user and database
 sudo -u postgres createuser testuser
-sudo -u postgres createdb trackman_test
+sudo -u postgres createdb database_test
 sudo -u postgres psql -c "ALTER USER testuser WITH PASSWORD 'testpassword';"
 
 # Connect and run the SQL above
-psql -U testuser -d trackman_test
+psql -U testuser -d database_test
 ```
 
 ## Option 3: Run Unit Tests (No Database Required)
@@ -154,10 +154,10 @@ We have unit tests that mock the Redshift connection:
 
 ```bash
 # Run Redshift integration tests
-poetry run pytest tests/test_trackman_redshift.py -v
+poetry run pytest tests/test_database_redshift.py -v
 
-# Run all Trackman tests
-poetry run pytest tests/ -k trackman -v
+# Run all Database tests
+poetry run pytest tests/ -k database -v
 ```
 
 These tests verify:
@@ -182,13 +182,13 @@ The integration layer is identical for both data sources, so if it works with Ex
 
 When the app starts, you should see:
 ```
-INFO: Trackman data source initialized: RedshiftDataSource
-INFO: Connected to Redshift at localhost:5432/trackman_test
+INFO: Database data source initialized: RedshiftDataSource
+INFO: Connected to Redshift at localhost:5432/database_test
 ```
 
 Or with Excel:
 ```
-INFO: Trackman data source initialized: ExcelDataSource
+INFO: Database data source initialized: ExcelDataSource
 INFO: Found 2 Excel file(s) in data/testtrack
 ```
 
@@ -207,12 +207,12 @@ The assistant should respond with tables and summaries.
 You can also test the tool directly in Python:
 
 ```python
-from code.backend.batch.utilities.tools.trackman_query_tool import TrackmanQueryTool
+from code.backend.batch.utilities.tools.database_query_tool import DatabaseQueryTool
 
-tool = TrackmanQueryTool()
+tool = DatabaseQueryTool()
 
 # Test errors query
-result = tool.query_trackman_data(
+result = tool.query_database_data(
     intent="errors_summary",
     facility_id="FAC001",
     range_days=7
@@ -228,7 +228,7 @@ print(result)
 
 ### Authentication failed
 - Verify username/password in `.env` match database settings
-- Try connecting manually: `psql -h localhost -U testuser -d trackman_test`
+- Try connecting manually: `psql -h localhost -U testuser -d database_test`
 
 ### Table not found
 - Ensure you ran all the CREATE TABLE statements

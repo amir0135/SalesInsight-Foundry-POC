@@ -1,4 +1,4 @@
-"""Visualization helper for TrackMan query results.
+"""Visualization helper for Database query results.
 
 Analyzes query results and suggests appropriate chart types and configurations.
 """

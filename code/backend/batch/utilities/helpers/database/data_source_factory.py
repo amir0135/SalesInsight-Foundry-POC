@@ -1,24 +1,24 @@
-"""Factory for creating Trackman data sources."""
+"""Factory for creating Database data sources."""
 
 import logging
 import os
 from typing import Optional
 
-from .data_source_interface import TrackmanDataSource
+from .data_source_interface import DatabaseDataSource
 from .excel_data_source import ExcelDataSource
 from .redshift_data_source import RedshiftDataSource
 
 logger = logging.getLogger(__name__)
 
-_data_source_instance: Optional[TrackmanDataSource] = None
+_data_source_instance: Optional[DatabaseDataSource] = None
 
 
-def get_data_source() -> TrackmanDataSource:
+def get_data_source() -> DatabaseDataSource:
     """
-    Get the appropriate Trackman data source based on configuration.
+    Get the appropriate Database data source based on configuration.
 
     Returns:
-        TrackmanDataSource instance (Redshift or Excel fallback)
+        DatabaseDataSource instance (Redshift or Excel fallback)
 
     The function checks for:
     1. USE_REDSHIFT environment variable = "true"

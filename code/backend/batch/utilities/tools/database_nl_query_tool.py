@@ -1,4 +1,4 @@
-"""AI-powered natural language to SQL query tool for Trackman data.
+"""AI-powered natural language to SQL query tool for Database data.
 
 Enhanced with Azure AI Foundry integration:
 - Azure AI Tracing for observability
@@ -14,8 +14,8 @@ from typing import Dict, Optional
 
 from ..common.answer import Answer
 from ..helpers.llm_helper import LLMHelper
-from ..helpers.trackman.data_source_factory import get_data_source
-from ..helpers.trackman.redshift_config import (
+from ..helpers.database.data_source_factory import get_data_source
+from ..helpers.database.redshift_config import (
     get_schema_for_prompt,
     get_sql_generation_prompt,
     validate_generated_sql,
@@ -107,8 +107,8 @@ class SQLCache:
 _sql_cache = SQLCache()
 
 
-class TrackmanNLQueryTool:
-    """Tool for querying Trackman data using natural language.
+class DatabaseNLQueryTool:
+    """Tool for querying Database data using natural language.
 
     Enhanced with Azure AI Foundry integration:
     - Semantic caching for intelligent query matching
@@ -116,12 +116,12 @@ class TrackmanNLQueryTool:
     - Azure AI Tracing for observability
 
     This tool uses an LLM to generate SQL queries from natural language questions,
-    validates them for safety, and executes them against the Trackman database.
+    validates them for safety, and executes them against the Database database.
     """
 
     def __init__(self, use_semantic_cache: bool = True):
         """
-        Initialize the TrackmanNLQueryTool.
+        Initialize the DatabaseNLQueryTool.
 
         Args:
             use_semantic_cache: Whether to use semantic (embedding-based) caching.
@@ -138,7 +138,7 @@ class TrackmanNLQueryTool:
         # Content safety checker
         self.content_safety = get_content_safety_checker()
 
-    @trace_operation("sql_generation", {"tool": "trackman_nl_query"})
+    @trace_operation("sql_generation", {"tool": "database_nl_query"})
     def generate_sql_from_question(self, question: str, use_cache: bool = True) -> Dict:
         """
         Use LLM to generate SQL from natural language question.
@@ -149,7 +149,7 @@ class TrackmanNLQueryTool:
         - Azure AI tracing for observability
 
         Args:
-            question: Natural language question about Trackman data
+            question: Natural language question about Database data
             use_cache: Whether to use cached SQL if available (default: True)
 
         Returns:
@@ -245,10 +245,10 @@ class TrackmanNLQueryTool:
                 "completion_tokens": 0,
             }
 
-    @trace_operation("nl_query_execution", {"tool": "trackman_nl_query"})
+    @trace_operation("nl_query_execution", {"tool": "database_nl_query"})
     def query_with_natural_language(self, question: str, max_rows: int = 50) -> Answer:
         """
-        Execute a natural language query against Trackman data.
+        Execute a natural language query against Database data.
 
         Enhanced pipeline with Azure AI Foundry integration:
         0. Check input with Content Safety (blocks injection attacks)
@@ -281,7 +281,7 @@ class TrackmanNLQueryTool:
                 return Answer(
                     question=question,
                     answer="I'm sorry, but I can't process this request. "
-                    "Please rephrase your question about Trackman data.",
+                    "Please rephrase your question about Database data.",
                     source_documents=[],
                     prompt_tokens=0,
                     completion_tokens=0,
@@ -367,7 +367,7 @@ class TrackmanNLQueryTool:
     def _format_result(self, result: Dict, question: str) -> str:
         """Format query result as markdown table with optional visualization."""
         import json
-        from ..helpers.trackman.visualization_helper import analyze_data_for_visualization
+        from ..helpers.database.visualization_helper import analyze_data_for_visualization
 
         columns = result.get("columns", [])
         rows = result.get("rows", [])

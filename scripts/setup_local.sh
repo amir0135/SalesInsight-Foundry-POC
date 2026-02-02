@@ -4,7 +4,7 @@
 # =============================================================================
 # This script configures your local environment after deploying to Azure.
 # It pulls configuration from your Azure deployment and sets up all
-# necessary files for local development including TrackMan integration.
+# necessary files for local development including Database integration.
 #
 # Prerequisites:
 #   - Azure CLI installed and logged in (az login)
@@ -245,18 +245,18 @@ USE_ADVANCED_IMAGE_PROCESSING=false
 ADVANCED_IMAGE_PROCESSING_MAX_IMAGES=1
 
 # =============================================================================
-# TrackMan Data Integration (optional)
+# Database Data Integration (optional)
 # =============================================================================
 # Set USE_REDSHIFT=true to enable database queries via natural language
 # The local PostgreSQL container simulates the production Redshift database
 
 USE_REDSHIFT=true
-TRACKMAN_DATA_DIR=data/testtrack
+DATABASE_DATA_DIR=data/testtrack
 
 # Local PostgreSQL settings (for testing)
 REDSHIFT_HOST=localhost
 REDSHIFT_PORT=5432
-REDSHIFT_DB=trackman_test
+REDSHIFT_DB=database_test
 REDSHIFT_USER=testuser
 REDSHIFT_PASSWORD=testpassword
 REDSHIFT_SCHEMA=public
@@ -379,7 +379,7 @@ echo "   • Functions:  http://localhost:7071"
 echo ""
 echo "3. Upload documents via Admin UI, then ask questions in Chat UI"
 echo ""
-echo "4. For TrackMan queries (if enabled), try:"
+echo "4. For Database queries (if enabled), try:"
 echo "   • 'How many total errors occurred in the last 7 days?'"
 echo "   • 'Which facility has the most errors?'"
 echo ""

@@ -1,8 +1,8 @@
-# Trackman AI-Powered Query Implementation
+# Database AI-Powered Query Implementation
 
 ## Overview
 
-This document describes the implementation of AI-powered natural language querying for Trackman data, which enhances the existing intent-based query system with flexible LLM-generated SQL queries and multi-step analysis capabilities.
+This document describes the implementation of AI-powered natural language querying for Database data, which enhances the existing intent-based query system with flexible LLM-generated SQL queries and multi-step analysis capabilities.
 
 ## Architecture
 
@@ -28,7 +28,7 @@ User Question
          ▼                ▼                ▼                 ▼
 ┌─────────────┐  ┌─────────────┐  ┌──────────────┐  ┌─────────────┐
 │ query_      │  │ query_      │  │ analyze_     │  │ search_     │
-│ trackman_   │  │ trackman_   │  │ trackman_    │  │ documents   │
+│ database_   │  │ database_   │  │ database_    │  │ documents   │
 │ data        │  │ flexible    │  │ data         │  │ (RAG)       │
 │ (Intent)    │  │ (AI SQL)    │  │ (Multi-step) │  │             │
 └──────┬──────┘  └──────┬──────┘  └──────┬───────┘  └─────────────┘
@@ -58,18 +58,18 @@ User Question
 
 | File | Purpose |
 |------|---------|
-| [trackman_nl_query_tool.py](../code/backend/batch/utilities/tools/trackman_nl_query_tool.py) | AI query tool with SQL generation + caching |
-| [trackman_analysis_tool.py](../code/backend/batch/utilities/tools/trackman_analysis_tool.py) | Multi-step analysis with query synthesis |
+| [database_nl_query_tool.py](../code/backend/batch/utilities/tools/database_nl_query_tool.py) | AI query tool with SQL generation + caching |
+| [database_analysis_tool.py](../code/backend/batch/utilities/tools/database_analysis_tool.py) | Multi-step analysis with query synthesis |
 
 ### Modified Files
 
 | File | Changes |
 |------|---------|
-| [redshift_config.py](../code/backend/batch/utilities/helpers/trackman/redshift_config.py) | Added schema descriptions, SQL generation prompt, validation functions |
-| [data_source_interface.py](../code/backend/batch/utilities/helpers/trackman/data_source_interface.py) | Added abstract `execute_custom_query()` method |
-| [redshift_data_source.py](../code/backend/batch/utilities/helpers/trackman/redshift_data_source.py) | Implemented `execute_custom_query()` method |
-| [excel_data_source.py](../code/backend/batch/utilities/helpers/trackman/excel_data_source.py) | Added stub for `execute_custom_query()` (raises NotImplementedError) |
-| [chat_plugin.py](../code/backend/batch/utilities/plugins/chat_plugin.py) | Added `query_trackman_flexible()` Semantic Kernel function |
+| [redshift_config.py](../code/backend/batch/utilities/helpers/database/redshift_config.py) | Added schema descriptions, SQL generation prompt, validation functions |
+| [data_source_interface.py](../code/backend/batch/utilities/helpers/database/data_source_interface.py) | Added abstract `execute_custom_query()` method |
+| [redshift_data_source.py](../code/backend/batch/utilities/helpers/database/redshift_data_source.py) | Implemented `execute_custom_query()` method |
+| [excel_data_source.py](../code/backend/batch/utilities/helpers/database/excel_data_source.py) | Added stub for `execute_custom_query()` (raises NotImplementedError) |
+| [chat_plugin.py](../code/backend/batch/utilities/plugins/chat_plugin.py) | Added `query_database_flexible()` Semantic Kernel function |
 
 ## Security Guardrails
 
@@ -108,7 +108,7 @@ def add_limit_if_missing(sql_query: str, max_rows: int = 100) -> str:
 ## Query Pipeline
 
 1. **User asks natural language question**
-2. **Semantic Kernel routes to `query_trackman_flexible()`**
+2. **Semantic Kernel routes to `query_database_flexible()`**
 3. **LLM generates SQL** using schema-aware system prompt
 4. **SQL validation** checks for dangerous patterns and table allowlist
 5. **LIMIT enforcement** adds row limit if missing
@@ -120,14 +120,14 @@ def add_limit_if_missing(sql_query: str, max_rows: int = 100) -> str:
 ### Standard Intent-Based Query (Existing)
 ```
 User: "Show me errors from the last 10 days"
-→ Uses: query_trackman_data(intent="errors_summary", range_days=10)
+→ Uses: query_database_data(intent="errors_summary", range_days=10)
 → Pre-defined SQL query
 ```
 
 ### Flexible AI-Powered Query (New)
 ```
 User: "Which 5 facilities have the most disconnections this week?"
-→ Uses: query_trackman_flexible(question="Which 5 facilities...")
+→ Uses: query_database_flexible(question="Which 5 facilities...")
 → LLM generates: SELECT facility_name, SUM(disconnection_cnt) as total
                  FROM connections
                  WHERE date >= CURRENT_DATE - INTERVAL '7 days'
@@ -219,14 +219,14 @@ The implementation includes a 2-tier caching system to reduce LLM calls:
 ### Cache Statistics
 
 ```python
-from backend.batch.utilities.tools.trackman_nl_query_tool import SQLCache
+from backend.batch.utilities.tools.database_nl_query_tool import SQLCache
 cache = SQLCache()
 print(cache.stats())  # {'size': 42, 'max_size': 1000, 'ttl_days': 7.0}
 ```
 
 ## Multi-Step Analysis Tool
 
-The `analyze_trackman_data()` function provides coordinated multi-query analysis:
+The `analyze_database_data()` function provides coordinated multi-query analysis:
 
 ### Analysis Types
 
@@ -241,7 +241,7 @@ The `analyze_trackman_data()` function provides coordinated multi-query analysis
 
 ```
 User: "Analyze the health of facility FAC001"
-→ analyze_trackman_data(analysis_type="facility_health", facility_id="FAC001")
+→ analyze_database_data(analysis_type="facility_health", facility_id="FAC001")
 → Runs 4 queries: errors, top errors, connectivity, data quality
 → LLM synthesizes insights from all results
 ```
@@ -331,15 +331,15 @@ We chose a dedicated analysis tool over `auto_invoke=True` because:
 
 If issues arise, the flexible query feature can be disabled by:
 
-1. Removing the `query_trackman_flexible` function from `chat_plugin.py`
-2. Removing the `analyze_trackman_data` function from `chat_plugin.py`
-3. The existing intent-based `query_trackman_data` function remains unchanged
+1. Removing the `query_database_flexible` function from `chat_plugin.py`
+2. Removing the `analyze_database_data` function from `chat_plugin.py`
+3. The existing intent-based `query_database_data` function remains unchanged
 
 ## Design Decisions
 
 ### Why Keep Dual LLM Calls (Not Single)?
 
-The orchestrator makes one LLM call to select a tool, then `query_trackman_flexible` makes another to generate SQL. We kept this separation because:
+The orchestrator makes one LLM call to select a tool, then `query_database_flexible` makes another to generate SQL. We kept this separation because:
 
 - **Clean architecture**: SQL generation logic stays in the tool, not the orchestrator
 - **Easier maintenance**: Schema changes don't affect orchestrator
@@ -348,7 +348,7 @@ The orchestrator makes one LLM call to select a tool, then `query_trackman_flexi
 
 ### Why Dedicated Analysis Tool (Not auto_invoke)?
 
-Instead of enabling `auto_invoke=True` for multi-step queries, we created `TrackmanAnalysisTool`:
+Instead of enabling `auto_invoke=True` for multi-step queries, we created `DatabaseAnalysisTool`:
 
 - **Deterministic**: Known queries for each analysis type
 - **Cost-controlled**: Fixed number of LLM calls per analysis

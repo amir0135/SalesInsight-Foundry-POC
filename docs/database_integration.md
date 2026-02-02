@@ -1,10 +1,10 @@
-# Trackman Data Integration
+# Database Data Integration
 
-This solution accelerator now supports querying Trackman operational data through a custom data tool integration.
+This solution accelerator now supports querying Database operational data through a custom data tool integration.
 
 ## Overview
 
-The Trackman integration provides access to operational data including:
+The Database integration provides access to operational data including:
 - **Error tracking**: Monitor facility errors, severity levels, and error patterns
 - **Connectivity status**: Track unit connectivity and disconnect reasons
 - **Facility metrics**: View comprehensive facility summaries and metadata
@@ -34,7 +34,7 @@ The Excel data source scans a directory for all Excel files and automatically me
 **Configuration**:
 ```bash
 # Optional - specify a different directory
-TRACKMAN_DATA_DIR=/path/to/your/excel/files
+DATABASE_DATA_DIR=/path/to/your/excel/files
 ```
 
 **Example**:
@@ -114,7 +114,7 @@ The Redshift integration includes multiple security layers:
 
 The allowlist configuration is in:
 ```
-code/backend/batch/utilities/helpers/trackman/redshift_config.py
+code/backend/batch/utilities/helpers/database/redshift_config.py
 ```
 
 To add new tables or columns, edit the `ALLOWED_TABLES` dictionary in this file.
@@ -178,7 +178,7 @@ The chat assistant formats this as markdown tables with summaries.
 Run the test suite:
 
 ```bash
-poetry run pytest code/tests/test_trackman_data_sources.py -v
+poetry run pytest code/tests/test_database_data_sources.py -v
 ```
 
 Tests cover:
@@ -199,9 +199,9 @@ Tests cover:
 
 ### Excel file not found
 ```
-Error: No such file or directory: 'data/trackman_test_data.xlsx'
+Error: No such file or directory: 'data/database_test_data.xlsx'
 ```
-**Solution**: Place your Excel file in the data directory or set `TRACKMAN_EXCEL_PATH`
+**Solution**: Place your Excel file in the data directory or set `DATABASE_EXCEL_PATH`
 
 ### Redshift connection failed
 ```

@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """
-TrackMan Integration Test Suite
+Database Integration Test Suite
 
-This script tests the TrackMan data integration by:
+This script tests the Database data integration by:
 1. Querying the API with various questions
 2. Verifying the responses contain expected data
 3. Cross-checking results against direct database queries
 
 Usage:
-    python tests/test_trackman_integration.py
+    python tests/test_database_integration.py
 
 Requirements:
     - Flask backend running on port 5050
-    - PostgreSQL database with TrackMan data
+    - PostgreSQL database with Database data
     - Environment variables set (or use start_local.sh)
 """
 
@@ -30,7 +30,7 @@ API_URL = "http://127.0.0.1:5050/api/conversation"
 DB_CONFIG = {
     "host": os.getenv("REDSHIFT_HOST", "localhost"),
     "port": os.getenv("REDSHIFT_PORT", "5432"),
-    "database": os.getenv("REDSHIFT_DB", "trackman_test"),
+    "database": os.getenv("REDSHIFT_DB", "database_test"),
     "user": os.getenv("REDSHIFT_USER", "testuser"),
     "password": os.getenv("REDSHIFT_PASSWORD", "testpassword"),
 }
@@ -244,7 +244,7 @@ def run_all_tests():
     global PASSED, FAILED, ERRORS
 
     print("\n" + "=" * 60)
-    print("TRACKMAN INTEGRATION TEST SUITE")
+    print("DATABASE INTEGRATION TEST SUITE")
     print("=" * 60)
 
     # Check prerequisites
@@ -433,7 +433,7 @@ def main():
     # Set environment variables if not set
     os.environ.setdefault("REDSHIFT_HOST", "localhost")
     os.environ.setdefault("REDSHIFT_PORT", "5432")
-    os.environ.setdefault("REDSHIFT_DB", "trackman_test")
+    os.environ.setdefault("REDSHIFT_DB", "database_test")
     os.environ.setdefault("REDSHIFT_USER", "testuser")
     os.environ.setdefault("REDSHIFT_PASSWORD", "testpassword")
 

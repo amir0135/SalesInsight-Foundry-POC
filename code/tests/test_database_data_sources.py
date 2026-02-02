@@ -1,4 +1,4 @@
-"""Tests for Trackman data sources."""
+"""Tests for Database data sources."""
 
 import os
 from datetime import datetime, timedelta
@@ -14,14 +14,14 @@ try:
 except ImportError:
     HAS_OPENPYXL = False
 
-from backend.batch.utilities.helpers.trackman.redshift_config import (
+from backend.batch.utilities.helpers.database.redshift_config import (
     validate_columns,
     validate_table,
 )
-from backend.batch.utilities.helpers.trackman.redshift_data_source import (
+from backend.batch.utilities.helpers.database.redshift_data_source import (
     RedshiftDataSource,
 )
-from backend.batch.utilities.helpers.trackman.data_source_factory import (
+from backend.batch.utilities.helpers.database.data_source_factory import (
     get_data_source,
     reset_data_source,
 )
@@ -34,9 +34,9 @@ def sample_excel_data(tmp_path):
     if not HAS_OPENPYXL:
         pytest.skip("openpyxl not installed")
 
-    from backend.batch.utilities.helpers.trackman.excel_data_source import ExcelDataSource  # noqa: F401
+    from backend.batch.utilities.helpers.database.excel_data_source import ExcelDataSource  # noqa: F401
 
-    excel_path = tmp_path / "test_trackman_data.xlsx"
+    excel_path = tmp_path / "test_database_data.xlsx"
 
     # Create sample data
     now = datetime.now()
@@ -114,7 +114,7 @@ class TestExcelDataSource:
     @pytest.fixture(autouse=True)
     def setup_excel_import(self):
         """Import ExcelDataSource for tests."""
-        from backend.batch.utilities.helpers.trackman.excel_data_source import ExcelDataSource
+        from backend.batch.utilities.helpers.database.excel_data_source import ExcelDataSource
         self.ExcelDataSource = ExcelDataSource
 
     def test_load_data(self, sample_excel_data):
@@ -310,8 +310,8 @@ class TestDataSourceFactory:
 
     def test_get_excel_data_source_default(self, sample_excel_data):
         """Test getting Excel data source by default."""
-        from backend.batch.utilities.helpers.trackman.excel_data_source import ExcelDataSource
-        with patch.dict(os.environ, {"TRACKMAN_EXCEL_PATH": sample_excel_data}):
+        from backend.batch.utilities.helpers.database.excel_data_source import ExcelDataSource
+        with patch.dict(os.environ, {"DATABASE_EXCEL_PATH": sample_excel_data}):
             ds = get_data_source()
             assert isinstance(ds, ExcelDataSource)
 
@@ -332,10 +332,10 @@ class TestDataSourceFactory:
 
     def test_fallback_to_excel_on_missing_vars(self, sample_excel_data):
         """Test fallback to Excel when Redshift vars missing."""
-        from backend.batch.utilities.helpers.trackman.excel_data_source import ExcelDataSource
+        from backend.batch.utilities.helpers.database.excel_data_source import ExcelDataSource
         with patch.dict(
             os.environ,
-            {"USE_REDSHIFT": "true", "TRACKMAN_EXCEL_PATH": sample_excel_data},
+            {"USE_REDSHIFT": "true", "DATABASE_EXCEL_PATH": sample_excel_data},
             clear=True,
         ):
             ds = get_data_source()
@@ -343,7 +343,7 @@ class TestDataSourceFactory:
 
     def test_singleton_behavior(self, sample_excel_data):
         """Test that factory returns same instance."""
-        with patch.dict(os.environ, {"TRACKMAN_EXCEL_PATH": sample_excel_data}):
+        with patch.dict(os.environ, {"DATABASE_EXCEL_PATH": sample_excel_data}):
             ds1 = get_data_source()
             ds2 = get_data_source()
             assert ds1 is ds2

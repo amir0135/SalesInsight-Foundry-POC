@@ -1,4 +1,4 @@
-"""Multi-step analysis tool for complex Trackman queries.
+"""Multi-step analysis tool for complex Database queries.
 
 This tool performs coordinated multi-query analysis, combining results
 from multiple data sources to answer complex analytical questions.
@@ -9,15 +9,15 @@ from typing import Dict, List
 
 from ..common.answer import Answer
 from ..helpers.llm_helper import LLMHelper
-from ..helpers.trackman.data_source_factory import get_data_source
-from .trackman_query_tool import TrackmanQueryTool
-from .trackman_nl_query_tool import TrackmanNLQueryTool
+from ..helpers.database.data_source_factory import get_data_source
+from .database_query_tool import DatabaseQueryTool
+from .database_nl_query_tool import DatabaseNLQueryTool
 
 logger = logging.getLogger(__name__)
 
 
 # Analysis prompt for synthesizing multi-query results
-SYNTHESIS_PROMPT = """You are a data analyst assistant. You have been given results from multiple database queries about Trackman facility operations.
+SYNTHESIS_PROMPT = """You are a data analyst assistant. You have been given results from multiple database queries about Database facility operations.
 
 Your task is to:
 1. Analyze the data from each query
@@ -36,8 +36,8 @@ Query Results:
 Provide your analysis:"""
 
 
-class TrackmanAnalysisTool:
-    """Tool for complex multi-step Trackman data analysis.
+class DatabaseAnalysisTool:
+    """Tool for complex multi-step Database data analysis.
 
     This tool coordinates multiple queries and synthesizes results
     to answer complex analytical questions that require data from
@@ -46,8 +46,8 @@ class TrackmanAnalysisTool:
 
     def __init__(self):
         self.llm_helper = LLMHelper()
-        self.query_tool = TrackmanQueryTool()
-        self.nl_query_tool = TrackmanNLQueryTool()
+        self.query_tool = DatabaseQueryTool()
+        self.nl_query_tool = DatabaseNLQueryTool()
         self.data_source = None
 
     def _get_data_source(self):

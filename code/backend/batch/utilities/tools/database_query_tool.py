@@ -1,4 +1,4 @@
-"""Trackman query tool for accessing operational data."""
+"""Database query tool for accessing operational data."""
 
 import json
 import logging
@@ -7,13 +7,13 @@ from typing import Annotated
 from semantic_kernel.functions import kernel_function
 
 from ..common.answer import Answer
-from ..helpers.trackman.data_source_factory import get_data_source
+from ..helpers.database.data_source_factory import get_data_source
 
 logger = logging.getLogger(__name__)
 
 
-class TrackmanQueryTool:
-    """Tool for querying Trackman operational data."""
+class DatabaseQueryTool:
+    """Tool for querying Database operational data."""
 
     VALID_INTENTS = [
         "errors_summary",
@@ -26,13 +26,13 @@ class TrackmanQueryTool:
 
     @kernel_function(
         description=(
-            "Query Trackman operational data including errors, connectivity, "
+            "Query Database operational data including errors, connectivity, "
             "facility information, and data quality metrics. "
-            "Use this when the user asks about TrackMan facility operations, "
+            "Use this when the user asks about Database facility operations, "
             "error reports, connectivity issues, or data quality."
         )
     )
-    def query_trackman(
+    def query_database(
         self,
         intent: Annotated[
             str,
@@ -49,7 +49,7 @@ class TrackmanQueryTool:
         limit: Annotated[int, "Maximum number of results to return (default: 10)"] = 10,
     ) -> Answer:
         """
-        Execute a Trackman data query.
+        Execute a Database data query.
 
         Args:
             intent: Type of query (e.g., 'errors_summary', 'facility_summary')
@@ -113,7 +113,7 @@ class TrackmanQueryTool:
             )
 
         except Exception as e:
-            error_msg = f"Error executing Trackman query: {str(e)}"
+            error_msg = f"Error executing Database query: {str(e)}"
             logger.error(error_msg, exc_info=True)
             return Answer(question="", answer=error_msg, source_documents=[])
 
@@ -132,7 +132,7 @@ class TrackmanQueryTool:
             row_count = metadata.get("rowCount", len(rows))
 
             summary_lines = [
-                f"**Trackman {intent.replace('_', ' ').title()} Report**",
+                f"**Database {intent.replace('_', ' ').title()} Report**",
                 f"Source: {source}",
                 f"Results: {row_count} rows",
             ]

@@ -1,6 +1,6 @@
 # Local Development Setup Guide
 
-This guide explains how to set up the **Chat With Your Data** solution accelerator with **TrackMan integration** for local development.
+This guide explains how to set up the **Chat With Your Data** solution accelerator with **Database integration** for local development.
 
 ## Quick Start
 
@@ -76,11 +76,11 @@ If you prefer manual configuration:
 | Chat API | 5050 | http://localhost:5050 | Flask backend API |
 | Admin UI | 8501 | http://localhost:8501 | Streamlit for document ingestion |
 | Azure Functions | 7071 | http://localhost:7071 | Background document processing |
-| PostgreSQL | 5432 | localhost:5432 | TrackMan test database |
+| PostgreSQL | 5432 | localhost:5432 | Database test database |
 
-## TrackMan Integration
+## Database Integration
 
-This fork includes **TrackMan data integration** for querying operational data via natural language.
+This fork includes **Database data integration** for querying operational data via natural language.
 
 ### Features
 - Natural language to SQL conversion
@@ -113,7 +113,7 @@ The `start_local.sh` script automatically starts a PostgreSQL container with tes
 # PostgreSQL connection (auto-configured)
 Host: localhost
 Port: 5432
-Database: trackman_test
+Database: database_test
 User: testuser
 Password: testpassword
 ```
@@ -125,7 +125,7 @@ To populate the test database with sample data:
 ```bash
 # The test data is auto-loaded from data/testtrack/
 # Or manually run:
-python -c "from code.backend.batch.utilities.helpers.trackman.load_test_data import load_all_test_data; load_all_test_data()"
+python -c "from code.backend.batch.utilities.helpers.database.load_test_data import load_all_test_data; load_all_test_data()"
 ```
 
 ### Production Redshift Configuration
@@ -181,8 +181,8 @@ npm install -g azure-functions-core-tools@4
 ### PostgreSQL container issues
 ```bash
 # Stop and remove container
-docker stop trackman-postgres
-docker rm trackman-postgres
+docker stop database-postgres
+docker rm database-postgres
 
 # Restart (start_local.sh will recreate it)
 ./start_local.sh
@@ -196,7 +196,7 @@ docker rm trackman-postgres
 
 To also stop PostgreSQL:
 ```bash
-docker stop trackman-postgres
+docker stop database-postgres
 ```
 
 ## File Structure
@@ -215,9 +215,9 @@ docker stop trackman-postgres
 │   │   ├── Admin.py        # Streamlit admin entry
 │   │   └── batch/
 │   │       ├── local.settings.json  # Azure Functions config
-│   │       └── utilities/helpers/trackman/  # TrackMan integration
+│   │       └── utilities/helpers/database/  # Database integration
 └── data/
-    └── testtrack/          # Test data for TrackMan
+    └── testtrack/          # Test data for Database
 ```
 
 ## Azure Resources Required

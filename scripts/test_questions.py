@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Interactive TrackMan Question Tester
+Interactive Database Question Tester
 
-Tests all the TrackMan questions and displays results in a clean format.
+Tests all the Database questions and displays results in a clean format.
 """
 
 import requests
@@ -77,7 +77,7 @@ def print_divider(char="=", width=80):
 def run_tests():
     """Run all tests interactively."""
     print_divider()
-    print("🔍 TRACKMAN QUESTION TESTER")
+    print("🔍 DATABASE QUESTION TESTER")
     print_divider()
 
     # Check API

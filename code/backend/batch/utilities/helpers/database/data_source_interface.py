@@ -1,11 +1,11 @@
-"""Interface for Trackman data sources."""
+"""Interface for Database data sources."""
 
 from abc import ABC, abstractmethod
 from typing import Dict, Optional
 
 
-class TrackmanDataSource(ABC):
-    """Abstract base class for Trackman data sources."""
+class DatabaseDataSource(ABC):
+    """Abstract base class for Database data sources."""
 
     @abstractmethod
     def get_errors_summary(
