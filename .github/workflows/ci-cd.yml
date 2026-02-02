@@ -9,12 +9,13 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 env:
-  AZURE_ENV_NAME: cwyd
   PYTHON_VERSION: '3.11'
   NODE_VERSION: '20'
+  ACR_NAME: acrcwydbjw4t
+  APP_NAME: app-cwydbjw4t
+  RESOURCE_GROUP: trackman-chatwithdata-POC
 
 jobs:
   # Job 1: Build and Test
@@ -54,60 +55,42 @@ jobs:
       - name: TypeScript check
         run: cd code/frontend && npx tsc --noEmit
 
-  # Job 2: Build Docker Image
-  build-docker:
-    name: Build Docker
+  # Job 2: Build and Deploy to Azure
+  deploy:
+    name: Build & Deploy
     runs-on: ubuntu-latest
     needs: build-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v5
 
-      - name: Build Docker image
-        run: |
-          docker build -f docker/Frontend.Dockerfile -t chat-web:${{ github.sha }} .
-          echo "✓ Docker image built successfully"
-
-  # Job 3: Deploy (manual trigger or main branch)
-  deploy:
-    name: Deploy to Azure
-    runs-on: ubuntu-latest
-    needs: build-docker
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment: production
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Install azd
-        uses: Azure/setup-azd@v2
-
-      - name: Log in with Azure (Federated Credentials)
-        if: ${{ vars.AZURE_CLIENT_ID != '' }}
-        run: |
-          azd auth login \
-            --client-id "${{ vars.AZURE_CLIENT_ID }}" \
-            --federated-credential-provider "github" \
-            --tenant-id "${{ vars.AZURE_TENANT_ID }}"
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Azure Login
+        uses: azure/login@v2
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: 'code/frontend/package-lock.json'
-
-      - name: Install dependencies
+      - name: Build and push to ACR
         run: |
-          pip install poetry
-          cd code/frontend && npm ci
+          az acr build \
+            --registry ${{ env.ACR_NAME }} \
+            --image chat-web:${{ github.sha }} \
+            --image chat-web:latest \
+            --file docker/Frontend.Dockerfile \
+            .
 
-      - name: Deploy to Azure
-        run: azd deploy web --no-prompt
-        env:
-          AZURE_ENV_NAME: ${{ env.AZURE_ENV_NAME }}
-          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Deploy to App Service
+        run: |
+          az webapp config container set \
+            --name ${{ env.APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --container-image-name ${{ env.ACR_NAME }}.azurecr.io/chat-web:${{ github.sha }}
+
+      - name: Restart App Service
+        run: |
+          az webapp restart \
+            --name ${{ env.APP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }}
+
+      - name: Deployment Summary
+        run: |
+          echo "Deployed to https://${{ env.APP_NAME }}.azurewebsites.net"

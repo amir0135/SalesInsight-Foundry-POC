@@ -49,7 +49,7 @@ install_macos() {
 
     # Install tools
     echo -e "${BLUE}Installing development tools...${NC}"
-    
+
     # Azure CLI
     if ! command -v az &> /dev/null; then
         echo -e "${YELLOW}Installing Azure CLI...${NC}"

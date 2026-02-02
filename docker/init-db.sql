@@ -34,10 +34,10 @@ CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation
 CREATE INDEX IF NOT EXISTS idx_feedback_message_id ON feedback(message_id);
 
 -- Sample data for testing (optional)
-INSERT INTO conversations (id, user_id, title) VALUES 
+INSERT INTO conversations (id, user_id, title) VALUES
     ('00000000-0000-0000-0000-000000000001', 'demo-user', 'Welcome Chat')
 ON CONFLICT DO NOTHING;
 
-INSERT INTO messages (conversation_id, role, content) VALUES 
+INSERT INTO messages (conversation_id, role, content) VALUES
     ('00000000-0000-0000-0000-000000000001', 'assistant', 'Welcome to Chat With Your Data! Ask me anything about your documents.')
 ON CONFLICT DO NOTHING;

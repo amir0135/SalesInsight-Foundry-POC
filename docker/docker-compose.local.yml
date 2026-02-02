@@ -2,7 +2,7 @@
 # Chat With Your Data - Docker Compose Setup
 # =============================================================================
 # Quick start: docker-compose up
-# 
+#
 # This runs the full application stack locally. You still need Azure resources
 # for OpenAI, Search, and Storage - but everything else runs in containers.
 # =============================================================================
