@@ -356,6 +356,15 @@ class EnvHelper:
             f"https://{self.AZURE_SPEECH_SERVICE_REGION}.api.cognitive.microsoft.com/",
         )
 
+        # Snowflake Configuration (SalesInsight POC - NL2SQL Data Source)
+        self.SNOWFLAKE_ACCOUNT = os.getenv("SNOWFLAKE_ACCOUNT", "")
+        self.SNOWFLAKE_USER = os.getenv("SNOWFLAKE_USER", "")
+        self.SNOWFLAKE_PASSWORD = self.secretHelper.get_secret("SNOWFLAKE_PASSWORD")
+        self.SNOWFLAKE_WAREHOUSE = os.getenv("SNOWFLAKE_WAREHOUSE", "")
+        self.SNOWFLAKE_DATABASE = os.getenv("SNOWFLAKE_DATABASE", "")
+        self.SNOWFLAKE_SCHEMA = os.getenv("SNOWFLAKE_SCHEMA", "PUBLIC")
+        self.SNOWFLAKE_ROLE = os.getenv("SNOWFLAKE_ROLE", "")
+
         self.LOAD_CONFIG_FROM_BLOB_STORAGE = self.get_env_var_bool(
             "LOAD_CONFIG_FROM_BLOB_STORAGE"
         )

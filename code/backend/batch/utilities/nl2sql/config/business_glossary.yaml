@@ -1,0 +1,127 @@
+# SalesInsight POC - Business Glossary Configuration
+# Maps business terms to SQL expressions for NL2SQL translation
+
+# Business term mappings
+# Format: business_term -> SQL expression
+term_mappings:
+  # Revenue/Value terms
+  turnover: "SUM(NetINV)"
+  revenue: "SUM(NetINV)"
+  sales: "SUM(NetINV)"
+  total_sales: "SUM(NetINV)"
+  net_invoice: "SUM(NetINV)"
+  invoice_value: "SUM(NetINV)"
+  
+  # Quantity terms
+  units_sold: "SUM(Quantity)"
+  quantity_sold: "SUM(Quantity)"
+  volume: "SUM(Quantity)"
+  pieces: "SUM(Quantity)"
+  
+  # Average terms
+  average_order_value: "AVG(NetINV)"
+  avg_price: "AVG(UnitPrice)"
+  average_quantity: "AVG(Quantity)"
+  
+  # Count terms
+  order_count: "COUNT(DISTINCT OrderID)"
+  customer_count: "COUNT(DISTINCT CustomerCode)"
+  style_count: "COUNT(DISTINCT StyleCode)"
+
+# Ranking/ordering terms
+# Maps qualitative terms to ORDER BY expressions
+ranking_terms:
+  best_sold: "ORDER BY SUM(Quantity) DESC"
+  top_selling: "ORDER BY SUM(Quantity) DESC"
+  most_popular: "ORDER BY SUM(Quantity) DESC"
+  highest_revenue: "ORDER BY SUM(NetINV) DESC"
+  best_performing: "ORDER BY SUM(NetINV) DESC"
+  worst_selling: "ORDER BY SUM(Quantity) ASC"
+  lowest_revenue: "ORDER BY SUM(NetINV) ASC"
+
+# Fiscal year definitions
+# Maps fiscal year references to date ranges
+fiscal_years:
+  "FY 24/25":
+    start: "2024-07-01"
+    end: "2025-06-30"
+    column_value: "FY 24/25"
+  "FY 25/26":
+    start: "2025-07-01"
+    end: "2026-06-30"
+    column_value: "FY 25/26"
+  "FY 26/27":
+    start: "2026-07-01"
+    end: "2027-06-30"
+    column_value: "FY 26/27"
+
+# Time period synonyms
+time_period_mappings:
+  this_year: "FY 25/26"  # Current fiscal year
+  current_year: "FY 25/26"
+  current_fy: "FY 25/26"
+  last_year: "FY 24/25"
+  previous_year: "FY 24/25"
+  previous_fy: "FY 24/25"
+  next_year: "FY 26/27"
+  next_fy: "FY 26/27"
+
+# Entity synonyms
+# Maps common variations of entity names
+entity_synonyms:
+  # Market variations
+  markets:
+    france: ["France", "FR", "french market"]
+    germany: ["Germany", "DE", "german market", "Deutschland"]
+    italy: ["Italy", "IT", "italian market", "Italia"]
+    spain: ["Spain", "ES", "spanish market", "España"]
+    uk: ["United Kingdom", "UK", "GB", "Britain", "british market"]
+    netherlands: ["Netherlands", "NL", "Holland", "dutch market"]
+    belgium: ["Belgium", "BE", "belgian market"]
+    
+  # Category variations
+  categories:
+    dresses: ["Dresses", "Dress", "dress"]
+    tops: ["Tops", "Top", "Blouses", "Blouse"]
+    bottoms: ["Bottoms", "Pants", "Trousers", "Skirts"]
+    outerwear: ["Outerwear", "Coats", "Jackets"]
+    accessories: ["Accessories", "Accessory"]
+
+# Column display names
+# Maps internal column names to user-friendly display names
+column_display_names:
+  StyleCode: "Style Code"
+  StyleName: "Style Name"
+  ColorCode: "Color Code"
+  ColorName: "Color"
+  VariantCode: "Size/Variant"
+  NetINV: "Net Invoice (€)"
+  CustomerCode: "Customer ID"
+  CustomerName: "Customer"
+  HoldingCode: "Holding ID"
+  HoldingName: "Holding Company"
+  DeliveryMonth: "Delivery Month"
+  FiscalYear: "Fiscal Year"
+
+# Default groupings for common query types
+default_groupings:
+  by_style: ["StyleCode", "StyleName"]
+  by_customer: ["CustomerCode", "CustomerName"]
+  by_market: ["Market"]
+  by_brand: ["Brand"]
+  by_category: ["Category"]
+  by_collection: ["Collection"]
+  by_month: ["DeliveryMonth"]
+
+# Numeric formatting
+formatting:
+  currency:
+    symbol: "€"
+    decimal_places: 2
+    thousands_separator: ","
+  quantity:
+    decimal_places: 0
+    thousands_separator: ","
+  percentage:
+    decimal_places: 1
+    suffix: "%"

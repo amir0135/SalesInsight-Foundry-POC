@@ -1,0 +1,126 @@
+# SalesInsight POC - SQL Allowlist Configuration
+# This file defines which tables and columns can be queried by the NL2SQL engine
+# Any table/column not in this list will be blocked for security
+
+# Allowed tables for SQL queries
+allowed_tables:
+  - OrderHistoryLine
+
+# Allowed columns per table
+# Only these columns can appear in SELECT, WHERE, GROUP BY, ORDER BY clauses
+allowed_columns:
+  OrderHistoryLine:
+    # Order identifiers
+    - OrderID
+    - OrderLineNumber
+    - OrderDate
+    
+    # Product information
+    - StyleCode
+    - StyleName
+    - ColorCode
+    - ColorName
+    - VariantCode
+    - VariantName
+    
+    # Quantity and value
+    - Quantity
+    - UnitPrice
+    - NetINV
+    - Currency
+    
+    # Customer information
+    - CustomerCode
+    - CustomerName
+    - HoldingCode
+    - HoldingName
+    
+    # Geographic information
+    - Market
+    - Country
+    
+    # Product categorization
+    - Brand
+    - Category
+    - SubCategory
+    
+    # Collection and timing
+    - Collection
+    - Season
+    - DeliveryMonth
+    - FiscalYear
+
+# SQL keywords that are BLOCKED (security)
+# These will cause query rejection if detected
+blocked_keywords:
+  - DELETE
+  - UPDATE
+  - INSERT
+  - DROP
+  - ALTER
+  - TRUNCATE
+  - CREATE
+  - REPLACE
+  - MERGE
+  - GRANT
+  - REVOKE
+  - EXEC
+  - EXECUTE
+  - CALL
+  - SET
+  - DECLARE
+  - CURSOR
+  - FETCH
+  - OPEN
+  - CLOSE
+  - DEALLOCATE
+
+# Allowed SQL functions
+# Only these functions can be used in queries
+allowed_functions:
+  # Aggregation
+  - SUM
+  - COUNT
+  - AVG
+  - MIN
+  - MAX
+  
+  # String
+  - UPPER
+  - LOWER
+  - TRIM
+  - CONCAT
+  - SUBSTRING
+  - LENGTH
+  
+  # Date/Time
+  - YEAR
+  - MONTH
+  - QUARTER
+  - DATE_TRUNC
+  - CURRENT_DATE
+  - CURRENT_TIMESTAMP
+  
+  # Conditional
+  - CASE
+  - WHEN
+  - THEN
+  - ELSE
+  - END
+  - COALESCE
+  - NULLIF
+  - IFF
+
+# Query limits
+query_limits:
+  max_result_rows: 1000
+  query_timeout_seconds: 30
+  max_joins: 0  # No joins allowed for POC (single table)
+
+# Validation settings
+validation:
+  require_limit_clause: true
+  max_query_length: 5000
+  allow_subqueries: false
+  allow_unions: false
+  allow_ctes: false

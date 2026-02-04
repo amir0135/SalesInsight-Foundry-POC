@@ -51,6 +51,11 @@ azure-core-tracing-opentelemetry = "^1.0.0b12"
 opentelemetry-api = "^1.26.0"
 opentelemetry-sdk = "^1.26.0"
 pyyaml = "^6.0.3"
+# SalesInsight POC - NL2SQL and Visualization
+snowflake-connector-python = "^3.6.0"
+matplotlib = "^3.8.0"
+seaborn = "^0.13.0"
+sqlparse = "^0.5.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.2"
