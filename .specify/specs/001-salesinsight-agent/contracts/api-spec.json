@@ -1,0 +1,347 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "SalesInsight AI Agent API",
+    "description": "API for natural language sales data queries with visualization",
+    "version": "1.0.0",
+    "contact": {
+      "name": "SalesInsight Team"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5050",
+      "description": "Local development server"
+    },
+    {
+      "url": "https://{appName}.azurewebsites.net",
+      "description": "Azure App Service",
+      "variables": {
+        "appName": {
+          "default": "salesinsight-poc"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/api/sales/query": {
+      "post": {
+        "summary": "Execute natural language sales query",
+        "description": "Converts natural language to SQL, executes against Snowflake, and returns results with optional visualization",
+        "operationId": "querySalesData",
+        "tags": ["Sales Queries"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueryRequest"
+              },
+              "examples": {
+                "bestSoldStyles": {
+                  "summary": "Best sold styles query",
+                  "value": {
+                    "question": "What are the best sold styles in France?",
+                    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "include_visualization": true
+                  }
+                },
+                "turnoverByBrand": {
+                  "summary": "Turnover by brand and market",
+                  "value": {
+                    "question": "What is the turnover in FY 25/26 in France for Brand X?",
+                    "include_visualization": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful query response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Query could not be processed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales/schema": {
+      "get": {
+        "summary": "Get available schema information",
+        "description": "Returns metadata about available tables and columns for querying",
+        "operationId": "getSalesSchema",
+        "tags": ["Schema"],
+        "responses": {
+          "200": {
+            "description": "Schema information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SchemaResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sales/health": {
+      "get": {
+        "summary": "Health check for sales service",
+        "description": "Verifies Snowflake connection and AI services are available",
+        "operationId": "healthCheck",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "Service healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["healthy", "degraded"]
+                    },
+                    "snowflake": {
+                      "type": "string",
+                      "enum": ["connected", "disconnected"]
+                    },
+                    "azure_openai": {
+                      "type": "string",
+                      "enum": ["available", "unavailable"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "QueryRequest": {
+        "type": "object",
+        "required": ["question"],
+        "properties": {
+          "question": {
+            "type": "string",
+            "description": "Natural language question about sales data",
+            "minLength": 1,
+            "maxLength": 1000,
+            "example": "What are the best sold styles in France?"
+          },
+          "session_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Optional session ID for conversation context"
+          },
+          "conversation_history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            },
+            "description": "Previous messages for context"
+          },
+          "include_visualization": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether to include chart visualization in response"
+          }
+        }
+      },
+      "QueryResponse": {
+        "type": "object",
+        "required": ["answer", "metadata"],
+        "properties": {
+          "answer": {
+            "type": "string",
+            "description": "Natural language response to the query",
+            "example": "The top 5 best sold styles in France are:\n\n1. **STYLE-001** (Classic Dress) - 2,450 units, €125,000"
+          },
+          "chart": {
+            "type": "string",
+            "description": "Base64 encoded PNG image as data URI",
+            "example": "data:image/png;base64,iVBORw0KGgo..."
+          },
+          "data_preview": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "description": "Sample data rows (max 10)",
+            "example": [
+              {"StyleCode": "STYLE-001", "StyleName": "Classic Dress", "Quantity": 2450, "Turnover": 125000}
+            ]
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/ResponseMetadata"
+          }
+        }
+      },
+      "ResponseMetadata": {
+        "type": "object",
+        "properties": {
+          "query_type": {
+            "type": "string",
+            "enum": ["aggregation", "list", "comparison", "time_series"],
+            "description": "Type of query executed"
+          },
+          "execution_time_ms": {
+            "type": "integer",
+            "description": "Query execution time in milliseconds"
+          },
+          "rows_returned": {
+            "type": "integer",
+            "description": "Number of data rows in result"
+          },
+          "has_visualization": {
+            "type": "boolean",
+            "description": "Whether chart was generated"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Tables used in query"
+          }
+        }
+      },
+      "Message": {
+        "type": "object",
+        "required": ["role", "content"],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": ["user", "assistant"]
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      },
+      "SchemaResponse": {
+        "type": "object",
+        "properties": {
+          "tables": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TableSchema"
+            }
+          },
+          "last_refreshed": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "TableSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "columns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ColumnSchema"
+            }
+          },
+          "row_count": {
+            "type": "integer"
+          }
+        }
+      },
+      "ColumnSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": ["INVALID_REQUEST", "QUERY_FAILED", "SQL_VALIDATION_ERROR", "CONNECTION_ERROR", "INTERNAL_ERROR"]
+              },
+              "message": {
+                "type": "string",
+                "description": "User-friendly error message"
+              },
+              "details": {
+                "type": "string",
+                "description": "Technical details (only in debug mode)"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Sales Queries",
+      "description": "Natural language queries for sales data"
+    },
+    {
+      "name": "Schema",
+      "description": "Schema discovery and metadata"
+    },
+    {
+      "name": "Health",
+      "description": "Service health checks"
+    }
+  ]
+}
