@@ -316,8 +316,10 @@ class QueryValidator:
         """Check for common SQL injection patterns."""
         injection_patterns = [
             r";\s*--",  # Statement termination with comment
-            r"'\s*OR\s+'1'\s*=\s*'1",  # Classic OR injection
+            r"'\s*OR\s+'1'\s*=\s*'1",  # Classic OR injection with quotes
             r"'\s*OR\s+1\s*=\s*1",  # Numeric OR injection
+            r"OR\s+'[^']+'\s*=\s*'[^']+'",  # Generic OR string comparison
+            r"OR\s+\d+\s*=\s*\d+",  # Generic OR numeric comparison
             r"UNION\s+SELECT",  # Union-based injection
             r"EXEC\s*\(",  # Execute function
             r"xp_",  # SQL Server extended procedures
@@ -418,12 +420,23 @@ class QueryValidator:
     def _get_column_name(self, token) -> Optional[str]:
         """Extract column name from identifier."""
         if isinstance(token, sqlparse.sql.Identifier):
+            # Check if this is a function call (contains parentheses)
+            token_str = str(token)
+            if "(" in token_str:
+                # This is a function like SUM(col) - skip it for column validation
+                # The actual column inside will be validated separately if needed
+                return None
+
             # Get the real name, handling table.column notation
             name = token.get_real_name()
             if name:
+                # Check if name itself looks like a function
+                if name.upper() in self.config.allowed_functions:
+                    return None
+
                 # Strip table prefix if present
-                if "." in str(token):
-                    parts = str(token).split(".")
+                if "." in token_str:
+                    parts = token_str.split(".")
                     return parts[-1].strip()
                 return name
         return None

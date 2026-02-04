@@ -24,6 +24,10 @@ from .snowflake_data_source import (
     SnowflakeDataSource,
     SnowflakeQueryError,
 )
+from .sqlite_data_source import (
+    SQLiteDataSource,
+    create_local_test_database,
+)
 
 __all__ = [
     # Base data source
@@ -36,6 +40,9 @@ __all__ = [
     "SnowflakeDataSource",
     "SnowflakeConnectionError",
     "SnowflakeQueryError",
+    # SQLite connector (local testing)
+    "SQLiteDataSource",
+    "create_local_test_database",
     # Schema discovery
     "SchemaDiscovery",
     "SchemaDiscoveryConfig",

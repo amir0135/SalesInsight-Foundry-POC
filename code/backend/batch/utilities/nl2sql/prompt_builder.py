@@ -53,12 +53,12 @@ Your task is to convert natural language questions into accurate, secure SQL que
 
 ## Output Format:
 You MUST respond with valid JSON in this exact format:
-{
+{{
   "sql": "YOUR SQL QUERY HERE",
   "explanation": "Brief explanation of what the query does",
-  "parameters": {"param_name": "value"},
+  "parameters": {{"param_name": "value"}},
   "confidence": 0.95
-}
+}}
 
 ## Business Context:
 {business_context}
