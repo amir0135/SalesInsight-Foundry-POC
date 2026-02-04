@@ -713,4 +713,9 @@ def create_app():
             return jsonify({"error": str(e)}), 500
 
     app.register_blueprint(bp_chat_history_response, url_prefix="/api")
+
+    # Register SalesInsight API blueprint
+    from backend.api.sales_insight import bp_sales_insight
+    app.register_blueprint(bp_sales_insight, url_prefix="/api")
+
     return app
