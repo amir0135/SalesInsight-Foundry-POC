@@ -10,15 +10,17 @@ This module provides the core agent that orchestrates:
 """
 
 import logging
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Union
 from uuid import uuid4
 
 import pandas as pd
 from openai import AzureOpenAI
 
 from ..data_sources import SchemaDiscovery, SnowflakeDataSource
+from ..data_sources.sqlite_data_source import SQLiteDataSource
 from ..helpers.env_helper import EnvHelper
 from ..nl2sql import NL2SQLGenerator, PromptBuilder, QueryValidator
 from ..visualization import ChartGenerator, ChartConfig, ChartType
@@ -124,7 +126,7 @@ class SalesInsightAgent:
     def __init__(
         self,
         config: Optional[SalesInsightConfig] = None,
-        data_source: Optional[SnowflakeDataSource] = None,
+        data_source: Optional[Union[SnowflakeDataSource, SQLiteDataSource]] = None,
         openai_client: Optional[AzureOpenAI] = None,
     ):
         """
@@ -178,14 +180,86 @@ class SalesInsightAgent:
             azure_endpoint=self.env_helper.AZURE_OPENAI_ENDPOINT,
         )
 
-    def _create_data_source(self) -> SnowflakeDataSource:
-        """Create Snowflake data source."""
-        return SnowflakeDataSource(
-            account=self.config.snowflake_account,
-            warehouse=self.config.snowflake_warehouse,
-            database=self.config.snowflake_database,
-            schema=self.config.snowflake_schema,
+    def _create_data_source(self) -> Union[SnowflakeDataSource, SQLiteDataSource]:
+        """Create data source based on environment configuration.
+        
+        Uses SQLite with local files if SALESINSIGHT_USE_LOCAL_DATA=true,
+        otherwise connects to Snowflake.
+        
+        Local mode supports:
+        - CSV files (.csv)
+        - Excel files (.xlsx, .xls)
+        - PDF tables (.pdf) - extracted via Azure Document Intelligence
+        """
+        use_local = os.environ.get("SALESINSIGHT_USE_LOCAL_DATA", "false").lower() == "true"
+        
+        if use_local:
+            return self._create_local_data_source()
+        else:
+            return SnowflakeDataSource(
+                account=self.config.snowflake_account,
+                warehouse=self.config.snowflake_warehouse,
+                database=self.config.snowflake_database,
+                schema=self.config.snowflake_schema,
+            )
+
+    def _create_local_data_source(self) -> SQLiteDataSource:
+        """Create local SQLite data source from files in the data directory.
+        
+        Automatically discovers and loads all supported files:
+        - CSV files become tables named after the file
+        - Excel files become tables named after the file
+        - PDF files are processed to extract tables
+        """
+        from pathlib import Path
+        
+        # Get data directory
+        data_dir = os.environ.get(
+            "SALESINSIGHT_DATA_DIR",
+            os.path.join(os.path.dirname(__file__), "../../../../../data")
         )
+        data_dir = os.path.abspath(data_dir)
+        
+        logger.info("Scanning data directory for files: %s", data_dir)
+        
+        # Discover all supported files
+        data_files = {}
+        supported_extensions = {'.csv', '.xlsx', '.xls', '.pdf'}
+        
+        if os.path.isdir(data_dir):
+            for file_path in Path(data_dir).iterdir():
+                if file_path.suffix.lower() in supported_extensions:
+                    # Create table name from filename (clean it up)
+                    table_name = self._file_to_table_name(file_path.stem)
+                    data_files[table_name] = str(file_path)
+                    logger.info("Found data file: %s -> table '%s'", file_path.name, table_name)
+        
+        # Allow explicit file override
+        explicit_path = os.environ.get("SALESINSIGHT_CSV_PATH")
+        if explicit_path and os.path.exists(explicit_path):
+            table_name = self._file_to_table_name(Path(explicit_path).stem)
+            data_files[table_name] = explicit_path
+        
+        if not data_files:
+            logger.warning("No data files found in %s", data_dir)
+        
+        logger.info("Using local SQLite data source with %d files", len(data_files))
+        return SQLiteDataSource.from_files(data_files)
+
+    def _file_to_table_name(self, filename: str) -> str:
+        """Convert a filename to a valid SQL table name."""
+        import re
+        # Remove common prefixes and clean up
+        name = filename.lower()
+        # Remove common database prefixes
+        name = re.sub(r'^db_[a-z]+_[a-z]+_[a-z]+_dbo_', '', name)
+        # Replace special chars with underscore
+        name = re.sub(r'[^a-z0-9]', '_', name)
+        # Remove multiple underscores
+        name = re.sub(r'_+', '_', name)
+        # Remove leading/trailing underscores
+        name = name.strip('_')
+        return name or "data"
 
     async def query(
         self,

@@ -1,15 +1,15 @@
 """
 Local SQLite Data Source for testing SalesInsight without Snowflake.
 
-This module provides a SQLite-based data source that can load CSV files
-for local development and testing.
+This module provides a SQLite-based data source that can load multiple file formats
+(CSV, XLSX, PDF tables) for local development and testing.
 """
 
 import logging
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 
@@ -22,29 +22,112 @@ class SQLiteDataSource(BaseDataSource):
     """
     SQLite-based data source for local testing.
 
-    This data source loads CSV files into an in-memory SQLite database,
+    This data source loads multiple file formats into an in-memory SQLite database,
     allowing local testing of NL2SQL queries without Snowflake.
+    
+    Supported formats:
+    - CSV files (.csv)
+    - Excel files (.xlsx, .xls)
+    - PDF tables (.pdf) - requires Azure Document Intelligence
     """
 
     def __init__(
         self,
         db_path: str = ":memory:",
         csv_files: Optional[Dict[str, str]] = None,
+        data_files: Optional[Dict[str, str]] = None,
     ):
         """
         Initialize SQLite data source.
 
         Args:
             db_path: Path to SQLite database file, or ":memory:" for in-memory
-            csv_files: Dict mapping table names to CSV file paths
+            csv_files: Dict mapping table names to CSV file paths (legacy)
+            data_files: Dict mapping table names to file paths (CSV, XLSX, PDF)
         """
         self._db_path = db_path
-        self._csv_files = csv_files or {}
+        # Merge csv_files into data_files for backward compatibility
+        self._data_files = data_files or {}
+        if csv_files:
+            self._data_files.update(csv_files)
         self._connection: Optional[sqlite3.Connection] = None
         self._schema_cache: Dict[str, TableSchema] = {}
 
+    @classmethod
+    def from_csv(cls, csv_path: str, table_name: str = "data") -> "SQLiteDataSource":
+        """
+        Create a SQLiteDataSource from a single CSV file.
+
+        Args:
+            csv_path: Path to the CSV file
+            table_name: Name of the table to create
+
+        Returns:
+            Configured SQLiteDataSource instance
+        """
+        instance = cls(
+            db_path=":memory:",
+            data_files={table_name: csv_path}
+        )
+        return instance
+
+    @classmethod
+    def from_excel(cls, excel_path: str, table_name: str = "data", sheet_name: Union[str, int] = 0) -> "SQLiteDataSource":
+        """
+        Create a SQLiteDataSource from an Excel file.
+
+        Args:
+            excel_path: Path to the Excel file
+            table_name: Name of the table to create
+            sheet_name: Sheet name or index to read
+
+        Returns:
+            Configured SQLiteDataSource instance
+        """
+        instance = cls(db_path=":memory:")
+        instance._excel_config = {table_name: {"path": excel_path, "sheet": sheet_name}}
+        instance._data_files[table_name] = excel_path
+        return instance
+
+    @classmethod
+    def from_files(cls, files: Dict[str, str]) -> "SQLiteDataSource":
+        """
+        Create a SQLiteDataSource from multiple files of various formats.
+        
+        File type is detected from extension (.csv, .xlsx, .xls, .pdf).
+
+        Args:
+            files: Dict mapping table names to file paths
+
+        Returns:
+            Configured SQLiteDataSource instance
+            
+        Example:
+            ds = SQLiteDataSource.from_files({
+                "orders": "data/orders.csv",
+                "products": "data/products.xlsx",
+                "sellout_report": "data/customer_sellout.pdf"
+            })
+        """
+        return cls(db_path=":memory:", data_files=files)
+
+    @classmethod
+    def from_dataframes(cls, dataframes: Dict[str, pd.DataFrame]) -> "SQLiteDataSource":
+        """
+        Create a SQLiteDataSource from pandas DataFrames directly.
+
+        Args:
+            dataframes: Dict mapping table names to DataFrames
+
+        Returns:
+            Configured SQLiteDataSource instance
+        """
+        instance = cls(db_path=":memory:")
+        instance._preloaded_dataframes = dataframes
+        return instance
+
     def connect(self) -> None:
-        """Connect to SQLite database and load CSV files."""
+        """Connect to SQLite database and load data files."""
         if self._connection is not None:
             return
 
@@ -52,45 +135,181 @@ class SQLiteDataSource(BaseDataSource):
         self._connection = sqlite3.connect(self._db_path)
         self._connection.row_factory = sqlite3.Row
 
-        # Load CSV files into tables
-        for table_name, csv_path in self._csv_files.items():
-            self._load_csv_to_table(table_name, csv_path)
+        # Load preloaded DataFrames first (if any)
+        if hasattr(self, '_preloaded_dataframes'):
+            for table_name, df in self._preloaded_dataframes.items():
+                self._load_dataframe_to_table(table_name, df)
 
-        logger.info("SQLite connection established with %d tables", len(self._csv_files))
+        # Load data files based on extension
+        for table_name, file_path in self._data_files.items():
+            self._load_file_to_table(table_name, file_path)
+
+        logger.info("SQLite connection established with %d tables", len(self._schema_cache))
+
+    def _load_file_to_table(self, table_name: str, file_path: str) -> None:
+        """Load a file into a SQLite table based on its extension."""
+        path = Path(file_path)
+        if not path.exists():
+            logger.warning("File not found: %s", file_path)
+            return
+
+        extension = path.suffix.lower()
+        
+        if extension == '.csv':
+            self._load_csv_to_table(table_name, file_path)
+        elif extension in ('.xlsx', '.xls'):
+            self._load_excel_to_table(table_name, file_path)
+        elif extension == '.pdf':
+            self._load_pdf_to_table(table_name, file_path)
+        else:
+            logger.warning("Unsupported file format: %s", extension)
 
     def _load_csv_to_table(self, table_name: str, csv_path: str) -> None:
         """Load a CSV file into a SQLite table."""
-        path = Path(csv_path)
-        if not path.exists():
-            logger.warning("CSV file not found: %s", csv_path)
-            return
-
-        logger.info("Loading %s from %s", table_name, csv_path)
+        logger.info("Loading CSV %s from %s", table_name, csv_path)
 
         try:
             # Read CSV with pandas
             df = pd.read_csv(csv_path, low_memory=False)
-
-            # Clean column names (remove spaces, special chars)
-            df.columns = [
-                col.strip().replace(" ", "_").replace("-", "_")
-                for col in df.columns
-            ]
-
-            # Write to SQLite
-            df.to_sql(table_name, self._connection, if_exists="replace", index=False)
-
-            logger.info(
-                "Loaded %d rows into %s (%d columns)",
-                len(df), table_name, len(df.columns)
-            )
-
-            # Cache schema
-            self._cache_table_schema(table_name, df)
-
+            self._load_dataframe_to_table(table_name, df)
         except Exception as e:
             logger.error("Failed to load CSV %s: %s", csv_path, e)
             raise
+
+    def _load_excel_to_table(self, table_name: str, excel_path: str) -> None:
+        """Load an Excel file into a SQLite table."""
+        logger.info("Loading Excel %s from %s", table_name, excel_path)
+
+        try:
+            # Check for specific sheet configuration
+            sheet_name = 0
+            if hasattr(self, '_excel_config') and table_name in self._excel_config:
+                sheet_name = self._excel_config[table_name].get('sheet', 0)
+
+            # Read Excel with pandas
+            df = pd.read_excel(excel_path, sheet_name=sheet_name)
+            self._load_dataframe_to_table(table_name, df)
+        except Exception as e:
+            logger.error("Failed to load Excel %s: %s", excel_path, e)
+            raise
+
+    def _load_pdf_to_table(self, table_name: str, pdf_path: str) -> None:
+        """
+        Load tables from a PDF file into SQLite.
+        
+        Uses Azure Document Intelligence to extract tables from PDFs.
+        Falls back to simple table extraction if Azure is not configured.
+        """
+        logger.info("Loading PDF %s from %s", table_name, pdf_path)
+
+        try:
+            # Try Azure Document Intelligence first
+            df = self._extract_tables_from_pdf_azure(pdf_path)
+            if df is not None and not df.empty:
+                self._load_dataframe_to_table(table_name, df)
+                return
+        except Exception as e:
+            logger.warning("Azure PDF extraction failed: %s. Trying fallback.", e)
+
+        try:
+            # Fallback: try tabula-py or camelot if available
+            df = self._extract_tables_from_pdf_fallback(pdf_path)
+            if df is not None and not df.empty:
+                self._load_dataframe_to_table(table_name, df)
+            else:
+                logger.warning("No tables found in PDF: %s", pdf_path)
+        except Exception as e:
+            logger.error("Failed to extract tables from PDF %s: %s", pdf_path, e)
+            raise
+
+    def _extract_tables_from_pdf_azure(self, pdf_path: str) -> Optional[pd.DataFrame]:
+        """Extract tables from PDF using Azure Document Intelligence."""
+        try:
+            from azure.ai.formrecognizer import DocumentAnalysisClient
+            from azure.identity import DefaultAzureCredential
+            from ..helpers.env_helper import EnvHelper
+            
+            env = EnvHelper()
+            endpoint = env.AZURE_FORM_RECOGNIZER_ENDPOINT
+            
+            if not endpoint:
+                logger.info("Azure Form Recognizer not configured")
+                return None
+            
+            credential = DefaultAzureCredential()
+            client = DocumentAnalysisClient(endpoint=endpoint, credential=credential)
+            
+            with open(pdf_path, "rb") as f:
+                poller = client.begin_analyze_document("prebuilt-layout", f)
+                result = poller.result()
+            
+            # Extract all tables and combine them
+            all_tables = []
+            for table in result.tables:
+                # Convert table to DataFrame
+                rows = {}
+                for cell in table.cells:
+                    row_idx = cell.row_index
+                    col_idx = cell.column_index
+                    if row_idx not in rows:
+                        rows[row_idx] = {}
+                    rows[row_idx][col_idx] = cell.content
+                
+                if rows:
+                    # First row as header
+                    headers = [rows.get(0, {}).get(i, f"col_{i}") for i in range(table.column_count)]
+                    data = []
+                    for row_idx in range(1, table.row_count):
+                        row_data = [rows.get(row_idx, {}).get(i, "") for i in range(table.column_count)]
+                        data.append(row_data)
+                    
+                    df = pd.DataFrame(data, columns=headers)
+                    all_tables.append(df)
+            
+            if all_tables:
+                # Concatenate all tables (assuming same structure)
+                return pd.concat(all_tables, ignore_index=True)
+            return None
+            
+        except ImportError:
+            logger.info("azure-ai-formrecognizer not installed")
+            return None
+
+    def _extract_tables_from_pdf_fallback(self, pdf_path: str) -> Optional[pd.DataFrame]:
+        """Extract tables from PDF using tabula-py (fallback method)."""
+        try:
+            import tabula
+            
+            # Read all tables from PDF
+            tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True)
+            
+            if tables:
+                # Concatenate all tables
+                return pd.concat(tables, ignore_index=True)
+            return None
+            
+        except ImportError:
+            logger.info("tabula-py not installed. Install with: pip install tabula-py")
+            return None
+
+    def _load_dataframe_to_table(self, table_name: str, df: pd.DataFrame) -> None:
+        """Load a pandas DataFrame into a SQLite table."""
+        # Clean column names (remove spaces, special chars)
+        df.columns = [
+            str(col).strip().replace(" ", "_").replace("-", "_").replace(".", "_")
+            for col in df.columns
+        ]
+
+        # Write to SQLite
+        df.to_sql(table_name, self._connection, if_exists="replace", index=False)
+
+        logger.info(
+            "Loaded %d rows into %s (%d columns)",
+            len(df), table_name, len(df.columns)
+        )
+
+        # Cache schema
+        self._cache_table_schema(table_name, df)
 
     def _cache_table_schema(self, table_name: str, df: pd.DataFrame) -> None:
         """Cache schema information for a table."""
