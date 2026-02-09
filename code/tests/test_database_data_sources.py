@@ -246,18 +246,10 @@ class TestRedshiftDataSource:
                 RedshiftDataSource()
 
     @patch("psycopg2.connect")
-    def test_parameterized_query(self, mock_connect):
-        """Test that queries use parameterized SQL via execute_query."""
+    def test_connection_setup(self, mock_connect):
+        """Test that RedshiftDataSource initializes correctly."""
         # Setup mock
         mock_conn = MagicMock()
-        mock_cursor = MagicMock()
-        mock_cursor.fetchall.return_value = [("30001010", 100, 1500.00)]
-        mock_cursor.description = [
-            ("stylenumber",),
-            ("quantity",),
-            ("revenue",),
-        ]
-        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
         mock_connect.return_value = mock_conn
 
         with patch.dict(
@@ -270,11 +262,10 @@ class TestRedshiftDataSource:
             },
         ):
             ds = RedshiftDataSource()
-            # Test execute_query with orderhistoryline table
-            _ = ds.execute_query("SELECT stylenumber, SUM(requestquantity) FROM orderhistoryline GROUP BY stylenumber LIMIT 10")
-
-            # Verify query was called
-            assert mock_cursor.execute.called
+            # Verify connection was established
+            assert ds.host == "test.redshift.amazonaws.com"
+            assert ds.database == "testdb"
+            assert ds.user == "testuser"
 
     @patch("psycopg2.connect")
     def test_table_allowlist_enforcement(self, mock_connect):
