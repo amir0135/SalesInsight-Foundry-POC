@@ -261,34 +261,84 @@ st.markdown("---")
 if data_source == "local":
     st.subheader("2️⃣ Local Data Configuration")
     
-    col1, col2 = st.columns(2)
+    st.markdown("### 📤 Upload CSV File")
+    uploaded_file = st.file_uploader(
+        "Upload a CSV file to use as your data source",
+        type=["csv"],
+        help="Upload a CSV file with headers. The file will be saved to the data/ folder."
+    )
     
-    with col1:
-        use_sample = st.checkbox(
-            "Use sample data (100 rows)",
-            value=config.get("local", {}).get("use_sample_data", True),
-            help="Use included sample data for testing. Uncheck to use your own CSV file."
-        )
-        config.setdefault("local", {})["use_sample_data"] = use_sample
+    if uploaded_file is not None:
+        # Preview the uploaded file
+        import pandas as pd
+        try:
+            df = pd.read_csv(uploaded_file, nrows=5)
+            st.write("**Preview (first 5 rows):**")
+            st.dataframe(df)
+            
+            # Show column info
+            st.write(f"**Columns ({len(df.columns)}):** {', '.join(df.columns.tolist())}")
+            
+            # Reset file position for saving
+            uploaded_file.seek(0)
+            
+            # Save button
+            col1, col2 = st.columns([1, 3])
+            with col1:
+                if st.button("💾 Save CSV to data/", type="primary"):
+                    import os
+                    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")
+                    os.makedirs(data_dir, exist_ok=True)
+                    
+                    # Save file
+                    file_path = os.path.join(data_dir, uploaded_file.name)
+                    with open(file_path, "wb") as f:
+                        f.write(uploaded_file.getvalue())
+                    
+                    st.success(f"✅ Saved to `{file_path}`")
+                    st.info("Restart the application to load the new data.")
+                    
+                    # Update config
+                    config.setdefault("local", {})["csv_path"] = file_path
+                    config["local"]["uploaded_file"] = uploaded_file.name
+                    
+        except Exception as e:
+            st.error(f"Error reading CSV: {e}")
     
-    if not use_sample:
-        with col2:
-            csv_path = st.text_input(
-                "CSV file path",
-                value=config.get("local", {}).get("csv_path", ""),
-                placeholder="/path/to/your/data.csv",
-                help="Path to your CSV file on the server"
-            )
-            config["local"]["csv_path"] = csv_path
+    st.markdown("---")
+    st.markdown("### 📁 Current Data Files")
     
-    st.success("✅ Local mode is ready to use. No additional configuration needed!")
+    # Show existing files in data/ folder
+    import os
+    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")
+    if os.path.isdir(data_dir):
+        csv_files = [f for f in os.listdir(data_dir) if f.endswith('.csv')]
+        if csv_files:
+            for f in csv_files:
+                file_path = os.path.join(data_dir, f)
+                size_mb = os.path.getsize(file_path) / (1024 * 1024)
+                
+                # Count rows
+                try:
+                    import subprocess
+                    result = subprocess.run(['wc', '-l', file_path], capture_output=True, text=True)
+                    rows = int(result.stdout.split()[0])
+                except:
+                    rows = "?"
+                
+                st.write(f"- **{f}** ({size_mb:.1f} MB, {rows} rows)")
+        else:
+            st.write("No CSV files found in data/ folder")
+    
+    st.success("✅ Local mode is ready! CSV files in data/ folder are automatically loaded.")
     
     st.info("""
-    **Local Mode Features:**
-    - Automatically loads CSV files from the `data/` folder
-    - Supports CSV, Excel (.xlsx), and PDF files
-    - Great for testing and demos
-    - Data is loaded into an in-memory SQLite database
+    **Supported Formats:**
+    - CSV files (.csv) - Comma-separated with headers
+    - Excel files (.xlsx, .xls) 
+    - The filename becomes the table name (cleaned up)
+    
+    **Your CSV:** `db_more_weu_prod_dbo_OrderHistoryLine.csv` → table `orderhistoryline`
     """)
 
 elif data_source == "snowflake":
