@@ -152,10 +152,18 @@ class SalesInsightAgent:
         else:
             self._data_source = self._create_data_source()
 
+        # Connect data source and load data BEFORE schema discovery
+        # This ensures tables exist when we discover the schema
+        self._data_source.connect()
+
         # Initialize components
         self._schema_discovery = SchemaDiscovery(self._data_source)
         self._sql_generator = NL2SQLGenerator(openai_client=self._openai_client)
-        self._query_validator = QueryValidator()
+        
+        # Build query validator dynamically from discovered schema
+        # This auto-allows all actual tables/columns - no manual config needed!
+        self._query_validator = self._create_query_validator()
+        
         self._prompt_builder = PromptBuilder()
         self._chart_generator = ChartGenerator()
 
@@ -173,12 +181,39 @@ class SalesInsightAgent:
         )
 
     def _create_openai_client(self) -> AzureOpenAI:
-        """Create Azure OpenAI client."""
-        return AzureOpenAI(
-            api_key=self.env_helper.AZURE_OPENAI_API_KEY,
-            api_version=self.env_helper.AZURE_OPENAI_API_VERSION,
-            azure_endpoint=self.env_helper.AZURE_OPENAI_ENDPOINT,
-        )
+        """Create Azure OpenAI client with key or RBAC authentication."""
+        if self.env_helper.is_auth_type_keys():
+            return AzureOpenAI(
+                api_key=self.env_helper.AZURE_OPENAI_API_KEY,
+                api_version=self.env_helper.AZURE_OPENAI_API_VERSION,
+                azure_endpoint=self.env_helper.AZURE_OPENAI_ENDPOINT,
+            )
+        else:
+            return AzureOpenAI(
+                azure_ad_token_provider=self.env_helper.AZURE_TOKEN_PROVIDER,
+                api_version=self.env_helper.AZURE_OPENAI_API_VERSION,
+                azure_endpoint=self.env_helper.AZURE_OPENAI_ENDPOINT,
+            )
+
+    def _create_query_validator(self) -> QueryValidator:
+        """Create query validator with allowlist built from actual schema.
+        
+        This dynamically discovers tables and columns from the data source,
+        so you don't need to manually maintain an allowlist YAML file.
+        """
+        # Get all tables (returns list of table names as strings)
+        table_names = self._schema_discovery.discover_tables()
+        
+        # Build schema dict: {table_name: [column_names]}
+        schema = {}
+        for table_name in table_names:
+            table_schema = self._schema_discovery.get_table_schema(table_name)
+            schema[table_name] = [col.name for col in table_schema.columns]
+        
+        logger.info(f"Built dynamic allowlist from schema: {list(schema.keys())}")
+        
+        # Create validator from schema - no YAML config needed!
+        return QueryValidator.from_schema(schema)
 
     def _create_data_source(self) -> Union[SnowflakeDataSource, SQLiteDataSource]:
         """Create data source based on environment configuration.

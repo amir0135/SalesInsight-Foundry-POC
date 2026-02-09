@@ -130,6 +130,64 @@ if [ "$SKIP_AZURE" = false ]; then
 fi
 
 # =============================================================================
+# Azure Storage Account Configuration
+# =============================================================================
+# Ensures storage account is accessible for local development.
+# Settings may reset daily due to Azure policies, so this runs on every startup.
+
+configure_azure_storage() {
+    echo -e "${BLUE}[Azure Storage] Configuring storage account for local access...${NC}"
+
+    # Get storage account name from .env
+    STORAGE_ACCOUNT=$(grep -E "^AZURE_BLOB_ACCOUNT_NAME=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || echo "")
+    RESOURCE_GROUP=$(grep -E "^AZURE_RESOURCE_GROUP=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || echo "")
+
+    if [ -z "$STORAGE_ACCOUNT" ]; then
+        echo -e "${YELLOW}  ⚠ AZURE_BLOB_ACCOUNT_NAME not found in .env, skipping storage config${NC}"
+        return 0
+    fi
+
+    # Try to infer resource group if not set
+    if [ -z "$RESOURCE_GROUP" ]; then
+        # Try to get it from Azure
+        RESOURCE_GROUP=$(az storage account list --query "[?name=='$STORAGE_ACCOUNT'].resourceGroup" -o tsv 2>/dev/null || echo "")
+    fi
+
+    if [ -z "$RESOURCE_GROUP" ]; then
+        echo -e "${YELLOW}  ⚠ Could not determine resource group for storage account${NC}"
+        return 0
+    fi
+
+    # Check and enable public network access if disabled
+    PUBLIC_ACCESS=$(az storage account show -n "$STORAGE_ACCOUNT" -g "$RESOURCE_GROUP" --query "publicNetworkAccess" -o tsv 2>/dev/null || echo "")
+
+    if [ "$PUBLIC_ACCESS" = "Disabled" ]; then
+        echo -e "${YELLOW}  Public network access is disabled, enabling for local dev...${NC}"
+        if az storage account update -n "$STORAGE_ACCOUNT" -g "$RESOURCE_GROUP" --public-network-access Enabled > /dev/null 2>&1; then
+            echo -e "${GREEN}  ✓ Public network access enabled${NC}"
+        else
+            echo -e "${RED}  ✗ Failed to enable public network access${NC}"
+            echo -e "${YELLOW}    You may need to enable it manually in Azure Portal${NC}"
+        fi
+    else
+        echo -e "${GREEN}  ✓ Public network access is enabled${NC}"
+    fi
+
+    # Verify RBAC roles for current user (informational only)
+    USER_ID=$(az ad signed-in-user show --query id -o tsv 2>/dev/null || echo "")
+    if [ -n "$USER_ID" ]; then
+        ROLES=$(az role assignment list --assignee "$USER_ID" --scope "/subscriptions/$(az account show --query id -o tsv)/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$STORAGE_ACCOUNT" --query "[].roleDefinitionName" -o tsv 2>/dev/null | tr '\n' ', ' || echo "")
+        if [ -n "$ROLES" ]; then
+            echo -e "${GREEN}  ✓ Your storage roles: ${ROLES%,}${NC}"
+        fi
+    fi
+}
+
+if [ "$SKIP_AZURE" = false ]; then
+    configure_azure_storage
+fi
+
+# =============================================================================
 # Python Environment Setup
 # =============================================================================
 # Ensures venv exists and all dependencies are installed - works on any computer
@@ -286,8 +344,36 @@ else
     setup_python_environment
 fi
 
-# Check if node_modules exists
-if [ ! -d "code/frontend/node_modules" ]; then
+# Check and setup frontend dependencies with rollup fix
+setup_frontend_dependencies() {
+    echo -e "${BLUE}[Frontend] Checking frontend dependencies...${NC}"
+    cd code/frontend
+
+    # Check if node_modules exists
+    if [ ! -d "node_modules" ]; then
+        echo -e "${YELLOW}  Frontend dependencies not installed. Installing...${NC}"
+        npm install
+        cd ../..
+        return 0
+    fi
+
+    # Check for corrupted rollup installation (common npm bug)
+    if ! node -e "require('@rollup/rollup-darwin-arm64')" 2>/dev/null && \
+       ! node -e "require('@rollup/rollup-darwin-x64')" 2>/dev/null; then
+        echo -e "${YELLOW}  Rollup module corrupted, reinstalling frontend dependencies...${NC}"
+        rm -rf node_modules package-lock.json
+        npm install
+        echo -e "${GREEN}  ✓ Frontend dependencies reinstalled${NC}"
+    else
+        echo -e "${GREEN}  ✓ Frontend dependencies OK${NC}"
+    fi
+
+    cd ../..
+}
+
+if [ "$SKIP_DEPS" = false ]; then
+    setup_frontend_dependencies
+elif [ ! -d "code/frontend/node_modules" ]; then
     echo -e "${YELLOW}⚠ Frontend dependencies not installed. Installing...${NC}"
     cd code/frontend && npm install && cd ../..
 elif [ "$SKIP_DEPS" = false ]; then
@@ -560,16 +646,82 @@ else
 fi
 
 # Check if PostgreSQL container is running (for Database/Redshift testing)
-if ! docker ps | grep -q database-postgres; then
-    echo -e "${YELLOW}Starting PostgreSQL container (for Database testing)...${NC}"
-    docker run -d \
-        --name database-postgres \
-        -e POSTGRES_USER=testuser \
-        -e POSTGRES_PASSWORD=testpassword \
-        -e POSTGRES_DB=database_test \
-        -p 5432:5432 \
-        postgres:14 2>/dev/null || docker start database-postgres 2>/dev/null || true
-    # Don't wait here - PostgreSQL will be ready by the time we need it
+POSTGRES_CONTAINER="salesinsight-postgres"
+POSTGRES_PORT=5433
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=database_test
+
+if ! docker ps | grep -q "$POSTGRES_CONTAINER"; then
+    echo -e "${YELLOW}Starting PostgreSQL container (for Sales Database testing)...${NC}"
+    
+    # Try to start existing container first, then create new one
+    if ! docker start "$POSTGRES_CONTAINER" 2>/dev/null; then
+        docker run -d \
+            --name "$POSTGRES_CONTAINER" \
+            -e POSTGRES_USER=$POSTGRES_USER \
+            -e POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
+            -e POSTGRES_DB=$POSTGRES_DB \
+            -p $POSTGRES_PORT:5432 \
+            postgres:15 2>/dev/null || true
+        
+        # Wait for PostgreSQL to be ready
+        echo -e "${YELLOW}  Waiting for PostgreSQL to start...${NC}"
+        sleep 5
+        
+        # Create table and load data if CSV exists
+        if [ -f "data/db_more_weu_prod_dbo_OrderHistoryLine.csv" ]; then
+            echo -e "${YELLOW}  Loading sales data into database...${NC}"
+            
+            # Create the table
+            docker exec "$POSTGRES_CONTAINER" psql -U $POSTGRES_USER -d $POSTGRES_DB -c "
+                DROP TABLE IF EXISTS orderhistoryline;
+                CREATE TABLE orderhistoryline (
+                    id SERIAL PRIMARY KEY,
+                    stylenumber TEXT,
+                    status TEXT,
+                    currencyisoalpha3 TEXT,
+                    unitnetprice DECIMAL(10,2),
+                    requestquantity INTEGER,
+                    allocatedquantity INTEGER,
+                    shippedquantity INTEGER,
+                    invoicedquantity INTEGER,
+                    cancelledquantity INTEGER,
+                    createdon DATE,
+                    requestdate DATE,
+                    shipdate DATE,
+                    ordertype TEXT,
+                    customerid TEXT,
+                    ordernumber TEXT,
+                    discountpercentage DECIMAL(5,2),
+                    brand TEXT,
+                    productline TEXT,
+                    gender TEXT,
+                    category TEXT,
+                    subcategory TEXT,
+                    season TEXT,
+                    year INTEGER
+                );
+            " 2>/dev/null || true
+            
+            # Load data from CSV
+            docker cp "data/db_more_weu_prod_dbo_OrderHistoryLine.csv" "$POSTGRES_CONTAINER:/tmp/data.csv"
+            docker exec "$POSTGRES_CONTAINER" psql -U $POSTGRES_USER -d $POSTGRES_DB -c "
+                COPY orderhistoryline(id, stylenumber, status, currencyisoalpha3, unitnetprice, 
+                    requestquantity, allocatedquantity, shippedquantity, invoicedquantity, 
+                    cancelledquantity, createdon, requestdate, shipdate, ordertype, customerid, 
+                    ordernumber, discountpercentage, brand, productline, gender, category, 
+                    subcategory, season, year)
+                FROM '/tmp/data.csv' DELIMITER ',' CSV HEADER;
+            " 2>/dev/null || true
+            
+            ROW_COUNT=$(docker exec "$POSTGRES_CONTAINER" psql -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(*) FROM orderhistoryline;" 2>/dev/null | tr -d ' ')
+            echo -e "${GREEN}  ✓ Loaded $ROW_COUNT rows into orderhistoryline table${NC}"
+        fi
+    fi
+    echo -e "${GREEN}✓ PostgreSQL container started${NC}"
+else
+    echo -e "${GREEN}✓ PostgreSQL container already running${NC}"
 fi
 
 # Kill any existing processes on our ports (in parallel for speed)
@@ -583,10 +735,10 @@ wait
 # Export environment variables for Database/Redshift
 export USE_REDSHIFT=true
 export REDSHIFT_HOST=localhost
-export REDSHIFT_PORT=5432
-export REDSHIFT_DB=database_test
-export REDSHIFT_USER=testuser
-export REDSHIFT_PASSWORD=testpassword
+export REDSHIFT_PORT=$POSTGRES_PORT
+export REDSHIFT_DB=$POSTGRES_DB
+export REDSHIFT_USER=$POSTGRES_USER
+export REDSHIFT_PASSWORD=$POSTGRES_PASSWORD
 
 # Activate virtual environment
 source .venv/bin/activate
@@ -611,6 +763,16 @@ echo -e "${GREEN}Starting Vite frontend on http://localhost:5173${NC}"
 cd code/frontend
 nohup npm run dev > /tmp/vite.log 2>&1 &
 VITE_PID=$!
+
+# Quick check if Vite crashed immediately (e.g., rollup issue)
+sleep 2
+if ! kill -0 $VITE_PID 2>/dev/null; then
+    echo -e "${YELLOW}  Vite crashed, attempting to fix dependencies...${NC}"
+    rm -rf node_modules package-lock.json
+    npm install > /dev/null 2>&1
+    nohup npm run dev > /tmp/vite.log 2>&1 &
+    VITE_PID=$!
+fi
 cd ../..
 
 # Start Streamlit Admin UI on port 8501 (parallel)

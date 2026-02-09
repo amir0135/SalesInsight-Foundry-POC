@@ -7,99 +7,40 @@ This matches the actual Database data schema from CSV exports.
 # Only these tables and columns can be queried
 
 ALLOWED_TABLES = {
-    "sessions": [
+    "orderhistoryline": [
         "id",
-        "sg_facility_id",
-        "sg_bay_id",
-        "activity_date",
-        "facility",
-        "bay",
-        "radar_serial",
-        "earliest_occurrence",
-        "latest_occurrence",
-        "session_count",
-        "strokes_total",
-        "ballspeed_cnt_total",
-        "clubspeed_cnt_total",
-        "clubspeed_pickup_total",
-        "strokes_shotanalysis",
-        "clubspeed_cnt_shotanalysis",
-        "clubspeed_pickup_shotanalysis",
-        "strokes_vgrange",
-        "clubspeed_cnt_vgrange",
-        "clubspeed_pickup_vgrange",
-        "strokes_courseplay",
-        "clubspeed_cnt_courseplay",
-        "clubspeed_pickup_courseplay",
-        "tps_version",
-        "iorelease",
-    ],
-    "connectivity_logs": [
-        "id",
-        "facility_id",
-        "facility_name",
-        "bay_id",
-        "bay_name",
-        "log_date",
-        "disconnection_cnt",
-        "model_status",
-        "client_version",
-        "radar_serial",
-        "radar_firmware",
-        "connection_type",
-        "speed_mbps",
-        "mode",
-        "device_root",
-        "cpu_freeze",
-    ],
-    "error_logs": [
-        "id",
-        "error_timestamp",
-        "facility_id",
-        "facility_name",
-        "bay_id",
-        "radar_serial",
-        "radar_firmware",
-        "radar_model",
-        "tps_messages_amount",
-        "event_level",
-        "message_id",
-        "message",
-        "facility",
-        "bay",
-    ],
-    "indoor_kpis": [
-        "id",
-        "facility_name",
-        "facility_id",
-        "bay_name",
-        "bay_id",
-        "is_bay_still_configured",
-        "does_bay_have_activity",
-        "timezone",
-        "visible_on_locator",
-        "earliest_last_bay_activity",
-        "latest_last_bay_activity",
-        "latest_configured_unit_activity",
-        "occupancy",
-        "configured_bays",
-        "active_units",
-        "total_strokes",
-        "strokes_per_bay",
-        "logged_in_players_per_bay",
-        "logged_in_players_w_app",
-        "logged_in_players_active_days_ratio",
+        "domainid",
+        "orderhistoryid",
+        "ean",
+        "softdeleted",
+        "ordertype",
+        "requesteddeliverydate",
+        "confirmeddeliverydate",
+        "requestquantity",
+        "requestquantitypieces",
+        "confirmeddeliveryquantity",
+        "confirmeddeliveryquantitypieces",
+        "currencyisoalpha3",
+        "unitretailprice",
+        "unitgrossprice",
+        "unitnetprice",
+        "stylenumber",
+        "status",
+        "skutype",
+        "discount",
+        "estimateddeliverydate",
+        "brandid",
+        "productlineid",
+        "note",
     ],
 }
 
 # Table aliases for backward compatibility
 TABLE_ALIASES = {
-    "errors": "error_logs",
-    "connectivity": "connectivity_logs",
-    "connections": "connectivity_logs",
-    "tps_messages": "error_logs",
-    "facility_kpis": "indoor_kpis",
-    "facility_metadata": "indoor_kpis",
+    "orders": "orderhistoryline",
+    "order_history": "orderhistoryline",
+    "sales": "orderhistoryline",
+    "products": "orderhistoryline",
 }
 
 
@@ -134,91 +75,44 @@ def get_allowed_columns(table_name: str) -> list:
 
 # Schema description for LLM SQL generation
 SCHEMA_DESCRIPTION = {
-    "sessions": {
-        "description": "Usage sessions data: strokes, activity dates, facility/bay info",
-        "common_uses": ["Usage patterns", "Stroke counts", "Activity analysis"],
-        "key_columns": {
-            "activity_date": "Date of activity (use for time filtering)",
-            "facility": "Facility name",
-            "sg_facility_id": "Facility ID for joins",
-            "strokes_total": "Total strokes in session",
-            "session_count": "Number of sessions",
-        },
-    },
-    "connectivity_logs": {
-        "description": "Network connectivity and disconnection events per facility/bay",
+    "orderhistoryline": {
+        "description": "Sales order history with product details, pricing, quantities, and delivery information",
         "common_uses": [
-            "Connectivity issues",
-            "Disconnection analysis",
-            "Network health",
-            "Which facilities have problems",
+            "Sales analysis",
+            "Revenue reporting",
+            "Order status tracking",
+            "Product performance",
+            "Delivery analysis",
         ],
         "key_columns": {
-            "log_date": "Date of event (use for time filtering with >= CURRENT_DATE - INTERVAL)",
-            "facility_id": "Facility UUID",
-            "facility_name": "Facility name (use for display and grouping)",
-            "disconnection_cnt": "Count of disconnections (SUM for totals)",
-            "connection_type": "Type of connection (wifi, ethernet, etc.)",
-            "speed_mbps": "Connection speed in Mbps",
-        },
-    },
-    "error_logs": {
-        "description": "System errors and alerts from Database devices",
-        "common_uses": [
-            "Error tracking",
-            "System alerts",
-            "Finding problem facilities",
-            "Most common errors",
-        ],
-        "key_columns": {
-            "error_timestamp": "Timestamp of error (use for time filtering with >= CURRENT_DATE - INTERVAL)",
-            "facility_id": "Facility UUID",
-            "facility_name": "Facility name (use for display and grouping)",
-            "event_level": "Severity level (CRITICAL, ERROR, WARNING, INFO) - use UPPER() for comparison",
-            "message": "The error message content (GROUP BY for common errors)",
-            "message_id": "Unique message identifier",
-        },
-    },
-    "indoor_kpis": {
-        "description": "Key performance indicators per facility - use for facility health and metrics",
-        "common_uses": [
-            "Performance metrics",
-            "Facility comparison",
-            "KPI analysis",
-            "Facility health",
-        ],
-        "key_columns": {
-            "facility_name": "Facility name",
-            "facility_id": "Facility UUID",
-            "occupancy": "Facility occupancy rate",
-            "total_strokes": "Total strokes tracked",
-            "strokes_per_bay": "Average strokes per bay",
-            "active_units": "Number of active units",
-            "configured_bays": "Number of configured bays",
+            "stylenumber": "Product style number (e.g., 30001010, 30001009) - use for product grouping",
+            "status": "Order status (OPEN, ALLOCATED) - use for filtering",
+            "currencyisoalpha3": "Currency code (EUR, USD)",
+            "unitnetprice": "Net price per unit - use for revenue calculations",
+            "unitgrossprice": "Gross price per unit",
+            "unitretailprice": "Retail price per unit",
+            "requestquantity": "Requested quantity",
+            "requestquantitypieces": "Requested quantity in pieces",
+            "confirmeddeliveryquantity": "Confirmed delivery quantity",
+            "requesteddeliverydate": "Requested delivery date (use for time filtering)",
+            "estimateddeliverydate": "Estimated delivery date",
+            "skutype": "SKU type (FreeAssortment, Assortment)",
+            "discount": "Discount percentage applied",
+            "brandid": "Brand identifier (e.g., B_21)",
+            "productlineid": "Product line identifier (e.g., B_2102)",
+            "softdeleted": "Whether order was soft deleted (true/false)",
+            "ean": "Product EAN barcode",
         },
     },
 }
 
 # Keywords that map to tables for smart schema retrieval
 TABLE_KEYWORDS = {
-    "error_logs": [
-        "error", "errors", "alert", "alerts", "problem", "problems",
-        "issue", "issues", "failure", "failures", "critical", "warning",
-        "message", "tps", "event_level", "severity"
-    ],
-    "connectivity_logs": [
-        "connectivity", "connection", "connections", "disconnect",
-        "disconnection", "disconnections", "network", "offline",
-        "online", "speed", "mbps", "wifi", "ethernet"
-    ],
-    "sessions": [
-        "session", "sessions", "stroke", "strokes", "usage",
-        "activity", "clubspeed", "ballspeed", "radar", "bay",
-        "shotanalysis", "vgrange", "courseplay"
-    ],
-    "indoor_kpis": [
-        "kpi", "kpis", "metric", "metrics", "performance",
-        "occupancy", "health", "summary", "overview", "facility"
+    "orderhistoryline": [
+        "order", "orders", "sales", "revenue", "product", "products",
+        "price", "pricing", "quantity", "delivery", "status", "discount",
+        "sku", "brand", "style", "currency", "eur", "usd", "allocated",
+        "open", "top", "best", "worst", "total", "count", "how many"
     ],
 }
 
@@ -233,20 +127,8 @@ def get_relevant_tables(question: str) -> list:
     Returns:
         List of relevant table names, or all tables if no match
     """
-    question_lower = question.lower()
-    relevant = set()
-
-    for table, keywords in TABLE_KEYWORDS.items():
-        for keyword in keywords:
-            if keyword in question_lower:
-                relevant.add(table)
-                break
-
-    # If no specific tables matched, return all (for general questions)
-    if not relevant:
-        return list(ALLOWED_TABLES.keys())
-
-    return list(relevant)
+    # For single-table setup, always return the main table
+    return list(ALLOWED_TABLES.keys())
 
 
 def get_schema_for_prompt(question: str = None) -> str:
@@ -283,46 +165,24 @@ def get_schema_for_prompt(question: str = None) -> str:
     return "\n".join(lines)
 
 
-# System prompt for SQL generation
-SQL_GENERATION_SYSTEM_PROMPT = """You are a SQL query generator for a Database data warehouse.
-Your task is to convert natural language questions into valid PostgreSQL/Redshift SQL queries.
+# System prompt for SQL generation (fallback if file not found)
+SQL_GENERATION_SYSTEM_PROMPT = """You are a SQL query generator for a sales order data warehouse.
+Your task is to convert natural language questions into valid PostgreSQL SQL queries.
 
 {schema}
 
-IMPORTANT TABLE NAMES (use exactly these):
-- error_logs: Contains all error/alert data. Use error_timestamp for time filtering.
-- connectivity_logs: Contains disconnection data. Use log_date for time filtering.
-- sessions: Contains usage/stroke data. Use activity_date for time filtering.
-- indoor_kpis: Contains facility KPI metrics.
+TABLE NAME (use exactly this):
+- orderhistoryline: Contains all sales order data
 
 RULES:
 1. ONLY generate SELECT queries - never INSERT, UPDATE, DELETE, DROP, etc.
-2. ONLY use tables and columns from the schema above.
-3. Use appropriate date filtering when the user mentions time periods.
+2. Return ONLY the SQL query, no explanations or markdown.
+3. Use lowercase for column names.
 4. Current date is: {current_date}
-5. Always include a LIMIT clause (max 100 rows) unless the user specifically asks for all data.
-6. For time filtering:
-   - error_logs: WHERE error_timestamp >= CURRENT_DATE - INTERVAL 'N days'
-   - connectivity_logs: WHERE log_date >= CURRENT_DATE - INTERVAL 'N days'
-   - sessions: WHERE activity_date >= CURRENT_DATE - INTERVAL 'N days'
-7. Use UPPER() for case-insensitive event_level comparisons.
-8. Return ONLY the SQL query, no explanations or markdown.
-9. Always include facility_name in SELECT for readability.
-10. For "most common" queries, use GROUP BY with COUNT(*) and ORDER BY DESC.
-11. For "worst" or "most problems" queries, aggregate errors or disconnections and ORDER BY DESC.
 
 Examples:
-- "Show me errors from the last week" ->
-SELECT facility_name, facility_id, message, event_level, error_timestamp FROM error_logs WHERE error_timestamp >= CURRENT_DATE - INTERVAL '7 days' ORDER BY error_timestamp DESC LIMIT 100
-
-- "Top 5 facilities by disconnections" ->
-SELECT facility_name, SUM(disconnection_cnt) as total_disconnections FROM connectivity_logs WHERE log_date >= CURRENT_DATE - INTERVAL '30 days' GROUP BY facility_name ORDER BY total_disconnections DESC LIMIT 5
-
-- "Most common error messages" ->
-SELECT message, COUNT(*) as count FROM error_logs WHERE error_timestamp >= CURRENT_DATE - INTERVAL '7 days' GROUP BY message ORDER BY count DESC LIMIT 20
-
-- "Which facilities have the most problems" ->
-SELECT facility_name, COUNT(*) as error_count FROM error_logs WHERE error_timestamp >= CURRENT_DATE - INTERVAL '7 days' GROUP BY facility_name ORDER BY error_count DESC LIMIT 20
+- "What are the top 10 products by revenue?" ->
+SELECT stylenumber, SUM(unitnetprice * requestquantity) as revenue FROM orderhistoryline WHERE softdeleted = false GROUP BY stylenumber ORDER BY revenue DESC LIMIT 10
 """
 
 

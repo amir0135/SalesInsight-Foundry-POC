@@ -58,9 +58,15 @@ class AzureBlobStorageClient:
             self.blob_service_client = BlobServiceClient(
                 account_url=self.endpoint, credential=get_azure_credential(env_helper.MANAGED_IDENTITY_CLIENT_ID)
             )
-            self.user_delegation_key = self.request_user_delegation_key(
-                blob_service_client=self.blob_service_client
-            )
+            try:
+                self.user_delegation_key = self.request_user_delegation_key(
+                    blob_service_client=self.blob_service_client
+                )
+            except Exception as e:
+                # Gracefully handle delegation key failure for local dev
+                import logging
+                logging.warning(f"Could not get user delegation key (may not be needed for local dev): {e}")
+                self.user_delegation_key = None
         else:
             self.account_key = account_key or env_helper.AZURE_BLOB_ACCOUNT_KEY
             self.blob_service_client = BlobServiceClient(

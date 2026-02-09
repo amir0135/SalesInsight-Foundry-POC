@@ -65,6 +65,73 @@ class QueryValidator:
     - Are properly parameterized
     """
 
+    # Default blocked keywords for security
+    DEFAULT_BLOCKED_KEYWORDS = [
+        "DELETE", "UPDATE", "INSERT", "DROP", "ALTER", "CREATE",
+        "TRUNCATE", "EXEC", "EXECUTE", "GRANT", "REVOKE"
+    ]
+
+    # Common SQL aggregation functions that are safe
+    DEFAULT_ALLOWED_FUNCTIONS = [
+        "SUM", "COUNT", "AVG", "MIN", "MAX", "ROUND", "COALESCE",
+        "UPPER", "LOWER", "TRIM", "CAST", "DATE", "YEAR", "MONTH", "DAY"
+    ]
+
+    @classmethod
+    def from_schema(
+        cls,
+        schema: dict[str, list[str]],
+        max_row_limit: int = 10000,
+        allow_joins: bool = True,
+    ) -> "QueryValidator":
+        """
+        Create a QueryValidator with allowlist dynamically built from schema.
+
+        This is the recommended way to create a validator - it automatically
+        allows all tables and columns discovered from the actual data source,
+        eliminating the need for manual YAML configuration.
+
+        Args:
+            schema: Dict mapping table names to list of column names
+                   e.g., {"orders": ["id", "customer_id", "total"]}
+            max_row_limit: Maximum rows allowed in LIMIT clause
+            allow_joins: Whether to allow JOIN operations
+
+        Returns:
+            QueryValidator configured for the given schema
+        """
+        # Build allowlist from schema - include both original and uppercase
+        allowed_tables = []
+        allowed_columns = {}
+
+        for table_name, columns in schema.items():
+            # Add table in both cases for flexible matching
+            allowed_tables.append(table_name)
+            allowed_tables.append(table_name.upper())
+
+            # Add columns for both case versions of table name
+            col_list = [c.upper() for c in columns]
+            allowed_columns[table_name.upper()] = col_list
+            allowed_columns[table_name] = col_list
+
+        config = AllowlistConfig(
+            allowed_tables=allowed_tables,
+            allowed_columns=allowed_columns,
+            blocked_keywords=cls.DEFAULT_BLOCKED_KEYWORDS,
+            allowed_functions=cls.DEFAULT_ALLOWED_FUNCTIONS,
+            max_row_limit=max_row_limit,
+            require_limit=True,
+            allow_joins=allow_joins,
+            allow_subqueries=False,
+        )
+
+        logger.info(
+            f"QueryValidator created from schema: {len(schema)} tables, "
+            f"{sum(len(cols) for cols in schema.values())} columns"
+        )
+
+        return cls(config=config)
+
     def __init__(
         self,
         config_path: Optional[str] = None,
@@ -418,27 +485,38 @@ class QueryValidator:
         return columns
 
     def _get_column_name(self, token) -> Optional[str]:
-        """Extract column name from identifier."""
+        """Extract the actual column name from an identifier, handling aliases.
+        
+        Examples:
+            'StyleNumber' -> 'StyleNumber'
+            'StyleNumber AS style' -> 'StyleNumber'  
+            'SUM(qty) AS total' -> None (function, skip)
+            'table.column' -> 'column'
+        """
         if isinstance(token, sqlparse.sql.Identifier):
-            # Check if this is a function call (contains parentheses)
             token_str = str(token)
+            
+            # Skip function calls like SUM(col), COUNT(*), etc.
             if "(" in token_str:
-                # This is a function like SUM(col) - skip it for column validation
-                # The actual column inside will be validated separately if needed
                 return None
 
-            # Get the real name, handling table.column notation
+            # get_real_name() returns the actual column, not the alias
+            # e.g., for "StyleNumber AS style" it returns "StyleNumber"
             name = token.get_real_name()
-            if name:
-                # Check if name itself looks like a function
-                if name.upper() in self.config.allowed_functions:
-                    return None
+            
+            if not name:
+                return None
+                
+            # Skip if it's a known function name
+            if name.upper() in self.config.allowed_functions:
+                return None
 
-                # Strip table prefix if present
-                if "." in token_str:
-                    parts = token_str.split(".")
-                    return parts[-1].strip()
-                return name
+            # Handle table.column notation - extract just the column
+            if "." in name:
+                name = name.split(".")[-1]
+            
+            return name.strip()
+            
         return None
 
     def _sanitize_sql(self, sql: str) -> str:

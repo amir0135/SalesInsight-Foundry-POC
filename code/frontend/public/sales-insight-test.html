@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SalesInsight Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        button {
+            padding: 12px 24px;
+            background: #0078d4;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:hover { background: #005a9e; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .result {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        .loading { text-align: center; color: #666; }
+        .error { color: #d83b01; background: #fde7e9; padding: 15px; border-radius: 8px; }
+        .sql { background: #f0f0f0; padding: 10px; border-radius: 4px; font-family: monospace; overflow-x: auto; }
+        .summary { color: #333; margin: 15px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; }
+        th { background: #f5f5f5; }
+        img { max-width: 100%; height: auto; margin: 15px 0; border-radius: 8px; }
+        .meta { font-size: 12px; color: #888; margin-top: 15px; }
+        .suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+        .suggestion {
+            padding: 8px 12px;
+            background: #e1f0ff;
+            border: none;
+            border-radius: 16px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .suggestion:hover { background: #cce5ff; }
+    </style>
+</head>
+<body>
+    <h1>🔍 SalesInsight NL2SQL Test</h1>
+    
+    <div class="suggestions">
+        <button class="suggestion" onclick="askQuestion('What are the top 5 brands by quantity?')">Top 5 brands by quantity</button>
+        <button class="suggestion" onclick="askQuestion('Show total revenue by currency')">Revenue by currency</button>
+        <button class="suggestion" onclick="askQuestion('Count orders by status')">Orders by status</button>
+        <button class="suggestion" onclick="askQuestion('What is the average discount by brand?')">Avg discount by brand</button>
+        <button class="suggestion" onclick="askQuestion('Show top 10 styles by total net price')">Top styles by price</button>
+    </div>
+
+    <div class="input-group">
+        <input type="text" id="question" placeholder="Ask a question about your sales data..." 
+               onkeypress="if(event.key==='Enter') submitQuestion()">
+        <button id="submitBtn" onclick="submitQuestion()">Ask</button>
+    </div>
+
+    <div id="result"></div>
+
+    <script>
+        const API_URL = 'http://localhost:5050/api/sales-insight/query';
+
+        function askQuestion(q) {
+            document.getElementById('question').value = q;
+            submitQuestion();
+        }
+
+        async function submitQuestion() {
+            const question = document.getElementById('question').value.trim();
+            if (!question) return;
+
+            const resultDiv = document.getElementById('result');
+            const submitBtn = document.getElementById('submitBtn');
+            
+            resultDiv.innerHTML = '<div class="result loading">⏳ Processing your question...</div>';
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                displayResult(data);
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            } finally {
+                submitBtn.disabled = false;
+            }
+        }
+
+        function displayResult(data) {
+            let html = '<div class="result">';
+            
+            // Summary
+            if (data.summary) {
+                html += `<div class="summary"><strong>📊 Summary:</strong> ${data.summary}</div>`;
+            }
+
+            // Chart
+            if (data.chart && data.chart.image_base64) {
+                html += `<img src="data:image/png;base64,${data.chart.image_base64}" alt="Chart">`;
+            }
+
+            // Data table
+            if (data.data && data.data.length > 0) {
+                const columns = Object.keys(data.data[0]);
+                html += '<table><thead><tr>';
+                columns.forEach(col => html += `<th>${col}</th>`);
+                html += '</tr></thead><tbody>';
+                data.data.forEach(row => {
+                    html += '<tr>';
+                    columns.forEach(col => html += `<td>${row[col]}</td>`);
+                    html += '</tr>';
+                });
+                html += '</tbody></table>';
+            }
+
+            // SQL query
+            if (data.sql_query) {
+                html += `<details><summary>🔧 SQL Query</summary><pre class="sql">${data.sql_query}</pre></details>`;
+            }
+
+            // Metadata
+            html += `<div class="meta">
+                ⏱️ ${data.execution_time_ms?.toFixed(0) || 'N/A'}ms | 
+                📝 ${data.row_count || 0} rows | 
+                🎯 Confidence: ${((data.metadata?.confidence || 0) * 100).toFixed(0)}%
+            </div>`;
+
+            html += '</div>';
+            document.getElementById('result').innerHTML = html;
+        }
+    </script>
+</body>
+</html>

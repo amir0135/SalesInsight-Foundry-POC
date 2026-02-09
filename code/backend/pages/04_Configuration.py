@@ -226,17 +226,44 @@ try:
             )
 
     # # # condense_question_prompt_help = "This prompt is used to convert the user's input to a standalone question, using the context of the chat history."
-    answering_system_prompt_help = "The system prompt used to answer the user's question. Only used if Azure OpenAI On Your Data prompt format is enabled."
-    answering_user_prompt_help = (
-        "The user prompt used to answer the user's question, using the sources that were retrieved from the knowledge base. If using the Azure OpenAI On Your Data prompt format, it is recommended to keep this simple, e.g.:  \n"
-        """```
+    answering_system_prompt_help = """**System Prompt** - Defines the AI assistant's behavior and response style.
+
+**Key sections to customize:**
+- **Role**: What kind of assistant (helpful, expert, formal/casual)
+- **Response Quality**: How detailed and thorough answers should be
+- **Formatting**: Use of markdown, lists, headers, tables
+- **Citation Rules**: How to reference source documents [doc1], [doc2]
+- **Out-of-scope handling**: What to say when info isn't available
+
+**Tips for better answers:**
+- Ask for "comprehensive" and "detailed" responses
+- Request specific formatting (bullets, headers)
+- Emphasize using ALL relevant information from documents
+- Require inline citations after each fact"""
+    
+    answering_user_prompt_help = """**User Prompt** - Sent with each question along with retrieved documents.
+
+**Required placeholders:**
+- `{sources}` - Retrieved document content
+- `{question}` - User's question
+
+**Example (recommended):**
+```
 ## Retrieved Documents
 {sources}
 
 ## User Question
-Use the Retrieved Documents to answer the question: {question}
-```"""
-    )
+{question}
+
+## Your Task
+Answer using the documents above.
+Include citations [doc1], [doc2] for facts.
+```
+
+**Tips:** Keep it simple but remind the AI to:
+- Give detailed answers
+- Include citations
+- Use good formatting"""
     post_answering_prompt_help = "You can configure a post prompt that allows to fact-check or process the answer, given the sources, question and answer. This prompt needs to return `True` or `False`."
     use_on_your_data_format_help = "Whether to use a similar prompt format to Azure OpenAI On Your Data, including separate system and user messages, and a few-shot example."
     post_answering_filter_help = "The message that is returned to the user, when the post-answering prompt returns."
@@ -280,20 +307,25 @@ Use the Retrieved Documents to answer the question: {question}
             key="use_on_your_data_format",
             help=use_on_your_data_format_help,
         )
+        
+        st.markdown("### 📝 System Prompt")
+        st.markdown("*Defines the AI's behavior, response style, and citation rules*")
+        st.text_area(
+            "Answering system prompt",
+            key="answering_system_prompt",
+            help=answering_system_prompt_help,
+            height=500,
+            disabled=not st.session_state["use_on_your_data_format"],
+        )
+        
+        st.markdown("### 💬 User Prompt")
+        st.markdown("*Template sent with each question (must include {sources} and {question})*")
         st.text_area(
             "Answering user prompt",
             key="answering_user_prompt",
             on_change=validate_answering_user_prompt,
             help=answering_user_prompt_help,
-            height=400,
-        )
-
-        st.text_area(
-            "Answering system prompt",
-            key="answering_system_prompt",
-            help=answering_system_prompt_help,
-            height=400,
-            disabled=not st.session_state["use_on_your_data_format"],
+            height=300,
         )
 
         st.text_area(

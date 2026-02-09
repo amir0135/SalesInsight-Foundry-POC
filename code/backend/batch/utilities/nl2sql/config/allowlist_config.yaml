@@ -4,51 +4,77 @@
 
 # Allowed tables for SQL queries
 allowed_tables:
-  - OrderHistoryLine
+  - orderhistoryline
+  - ORDERHISTORYLINE
 
-# Allowed columns per table
+# Allowed columns per table (from db_more_weu_prod_dbo_OrderHistoryLine.csv)
 # Only these columns can appear in SELECT, WHERE, GROUP BY, ORDER BY clauses
 allowed_columns:
-  OrderHistoryLine:
+  orderhistoryline:
     # Order identifiers
-    - OrderID
-    - OrderLineNumber
-    - OrderDate
+    - Id
+    - DomainId
+    - OrderHistoryId
+    - Ean
+    
+    # Status and type
+    - SoftDeleted
+    - OrderType
+    - Status
+    - SkuType
+    
+    # Dates
+    - RequestedDeliveryDate
+    - ConfirmedDeliveryDate
+    - EstimatedDeliveryDate
+    
+    # Quantity fields
+    - RequestQuantity
+    - RequestQuantityPieces
+    - ConfirmedDeliveryQuantity
+    - ConfirmedDeliveryQuantityPieces
+    
+    # Price and currency
+    - CurrencyIsoAlpha3
+    - UnitRetailPrice
+    - UnitGrossPrice
+    - UnitNetPrice
+    - Discount
     
     # Product information
-    - StyleCode
-    - StyleName
-    - ColorCode
-    - ColorName
-    - VariantCode
-    - VariantName
+    - StyleNumber
+    - BrandId
+    - ProductLineId
     
-    # Quantity and value
-    - Quantity
-    - UnitPrice
-    - NetINV
-    - Currency
-    
-    # Customer information
-    - CustomerCode
-    - CustomerName
-    - HoldingCode
-    - HoldingName
-    
-    # Geographic information
-    - Market
-    - Country
-    
-    # Product categorization
-    - Brand
-    - Category
-    - SubCategory
-    
-    # Collection and timing
-    - Collection
-    - Season
-    - DeliveryMonth
-    - FiscalYear
+    # Notes
+    - Note
+
+  # Also include uppercase version for case-insensitive matching
+  ORDERHISTORYLINE:
+    - ID
+    - DOMAINID
+    - ORDERHISTORYID
+    - EAN
+    - SOFTDELETED
+    - ORDERTYPE
+    - STATUS
+    - SKUTYPE
+    - REQUESTEDDELIVERYDATE
+    - CONFIRMEDDELIVERYDATE
+    - ESTIMATEDDELIVERYDATE
+    - REQUESTQUANTITY
+    - REQUESTQUANTITYPIECES
+    - CONFIRMEDDELIVERYQUANTITY
+    - CONFIRMEDDELIVERYQUANTITYPIECES
+    - CURRENCYISOALPHA3
+    - UNITRETAILPRICE
+    - UNITGROSSPRICE
+    - UNITNETPRICE
+    - DISCOUNT
+    - STYLENUMBER
+    - BRANDID
+    - PRODUCTLINEID
+    - NOTE
 
 # SQL keywords that are BLOCKED (security)
 # These will cause query rejection if detected
