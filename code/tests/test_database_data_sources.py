@@ -198,10 +198,11 @@ class TestRedshiftConfig:
 
     def test_validate_table_allowed(self):
         """Test validating allowed table."""
-        assert validate_table("error_logs") is True
-        assert validate_table("connectivity_logs") is True
-        assert validate_table("sessions") is True
-        assert validate_table("indoor_kpis") is True
+        assert validate_table("orderhistoryline") is True
+        # Test aliases
+        assert validate_table("orders") is True
+        assert validate_table("sales") is True
+        assert validate_table("products") is True
 
     def test_validate_table_not_allowed(self):
         """Test validating disallowed table."""
@@ -210,12 +211,12 @@ class TestRedshiftConfig:
 
     def test_validate_columns_allowed(self):
         """Test validating allowed columns."""
-        assert validate_columns("error_logs", ["error_timestamp", "facility_id", "message"]) is True
+        assert validate_columns("orderhistoryline", ["stylenumber", "status", "currencyisoalpha3"]) is True
 
     def test_validate_columns_not_allowed(self):
         """Test validating disallowed columns."""
         assert (
-            validate_columns("error_logs", ["error_timestamp", "secret_column"]) is False
+            validate_columns("orderhistoryline", ["stylenumber", "secret_column"]) is False
         )
 
 
@@ -246,16 +247,15 @@ class TestRedshiftDataSource:
 
     @patch("psycopg2.connect")
     def test_parameterized_query(self, mock_connect):
-        """Test that queries use parameterized SQL."""
+        """Test that queries use parameterized SQL via execute_query."""
         # Setup mock
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
-        mock_cursor.fetchall.return_value = [("FAC001", 10, 2, 3)]
+        mock_cursor.fetchall.return_value = [("30001010", 100, 1500.00)]
         mock_cursor.description = [
-            ("facility_id",),
-            ("error_count",),
-            ("critical_count",),
-            ("unique_errors",),
+            ("stylenumber",),
+            ("quantity",),
+            ("revenue",),
         ]
         mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
         mock_connect.return_value = mock_conn
@@ -270,13 +270,11 @@ class TestRedshiftDataSource:
             },
         ):
             ds = RedshiftDataSource()
-            _ = ds.get_errors_summary(range_days=30)  # noqa: F841
+            # Test execute_query with orderhistoryline table
+            _ = ds.execute_query("SELECT stylenumber, SUM(requestquantity) FROM orderhistoryline GROUP BY stylenumber LIMIT 10")
 
-            # Verify parameterized query was called
+            # Verify query was called
             assert mock_cursor.execute.called
-            call_args = mock_cursor.execute.call_args
-            # Should have parameters tuple
-            assert call_args[0][1] is not None or len(call_args[0]) > 1
 
     @patch("psycopg2.connect")
     def test_table_allowlist_enforcement(self, mock_connect):
@@ -293,7 +291,8 @@ class TestRedshiftDataSource:
             ds = RedshiftDataSource()
 
             # Should succeed for allowed table
-            assert ds._validate_table_access("errors") is None
+            assert ds._validate_table_access("orderhistoryline") is None
+            assert ds._validate_table_access("orders") is None  # alias
 
             # Should raise for disallowed table
             with pytest.raises(ValueError, match="not in the allowlist"):

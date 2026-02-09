@@ -309,11 +309,12 @@ class TestQueryValidatorSanitization:
         assert "SELECT" in result.sanitized_sql
         assert "FROM" in result.sanitized_sql
 
-    def test_semicolon_added(self, validator):
-        """Test that semicolon is added if missing."""
+    def test_semicolon_not_added(self, validator):
+        """Test that semicolons are NOT added (they're blocked for security)."""
         sql = "SELECT ItemNo FROM OrderHistoryLine LIMIT 10"
         result = validator.validate(sql)
-        assert result.sanitized_sql.endswith(";")
+        # Semicolons are blocked for security, so they should not be present
+        assert ";" not in result.sanitized_sql
 
 
 class TestValidationResult:
