@@ -239,35 +239,74 @@ class SalesInsightAgent:
             )
 
     def _create_local_data_source(self) -> SQLiteDataSource:
-        """Create local SQLite data source from files in the data directory.
+        """Create local SQLite data source from files.
+        
+        In production (Azure): Downloads CSV from Azure Blob Storage
+        In local dev: Loads from data/ folder
         
         Automatically discovers and loads all supported files:
         - CSV files become tables named after the file
         - Excel files become tables named after the file
-        - PDF files are processed to extract tables
         """
         from pathlib import Path
+        import tempfile
         
-        # Get data directory
-        data_dir = os.environ.get(
-            "SALESINSIGHT_DATA_DIR",
-            os.path.join(os.path.dirname(__file__), "../../../../../data")
-        )
-        data_dir = os.path.abspath(data_dir)
+        is_production = os.environ.get("WEBSITE_SITE_NAME") is not None
         
-        logger.info("Scanning data directory for files: %s", data_dir)
-        
-        # Discover all supported files
         data_files = {}
-        supported_extensions = {'.csv', '.xlsx', '.xls', '.pdf'}
         
-        if os.path.isdir(data_dir):
-            for file_path in Path(data_dir).iterdir():
-                if file_path.suffix.lower() in supported_extensions:
-                    # Create table name from filename (clean it up)
-                    table_name = self._file_to_table_name(file_path.stem)
-                    data_files[table_name] = str(file_path)
-                    logger.info("Found data file: %s -> table '%s'", file_path.name, table_name)
+        # In production, try to load from blob storage first
+        if is_production:
+            try:
+                from ..helpers.azure_blob_storage_client import AzureBlobStorageClient
+                import json
+                
+                # Check for uploaded CSV config
+                config_client = AzureBlobStorageClient(container_name="config")
+                try:
+                    config_data = config_client.download_file("database_connection.json")
+                    config = json.loads(config_data)
+                    blob_path = config.get("local", {}).get("blob_path")
+                    
+                    if blob_path:
+                        logger.info("Loading CSV from blob storage: %s", blob_path)
+                        blob_client = AzureBlobStorageClient(container_name="salesdata")
+                        csv_data = blob_client.download_file(blob_path)
+                        
+                        # Save to temp file
+                        temp_dir = tempfile.mkdtemp()
+                        filename = os.path.basename(blob_path)
+                        temp_path = os.path.join(temp_dir, filename)
+                        with open(temp_path, "wb") as f:
+                            f.write(csv_data)
+                        
+                        table_name = self._file_to_table_name(Path(filename).stem)
+                        data_files[table_name] = temp_path
+                        logger.info("Loaded blob CSV as table: %s", table_name)
+                except Exception as e:
+                    logger.warning("Could not load config from blob: %s", e)
+                    
+            except Exception as e:
+                logger.warning("Blob storage not available: %s", e)
+        
+        # Fall back to local data directory
+        if not data_files:
+            data_dir = os.environ.get(
+                "SALESINSIGHT_DATA_DIR",
+                os.path.join(os.path.dirname(__file__), "../../../../../data")
+            )
+            data_dir = os.path.abspath(data_dir)
+            
+            logger.info("Scanning data directory for files: %s", data_dir)
+            
+            supported_extensions = {'.csv', '.xlsx', '.xls'}
+            
+            if os.path.isdir(data_dir):
+                for file_path in Path(data_dir).iterdir():
+                    if file_path.suffix.lower() in supported_extensions:
+                        table_name = self._file_to_table_name(file_path.stem)
+                        data_files[table_name] = str(file_path)
+                        logger.info("Found data file: %s -> table '%s'", file_path.name, table_name)
         
         # Allow explicit file override
         explicit_path = os.environ.get("SALESINSIGHT_CSV_PATH")
@@ -276,7 +315,7 @@ class SalesInsightAgent:
             data_files[table_name] = explicit_path
         
         if not data_files:
-            logger.warning("No data files found in %s", data_dir)
+            logger.warning("No data files found")
         
         logger.info("Using local SQLite data source with %d files", len(data_files))
         return SQLiteDataSource.from_files(data_files)

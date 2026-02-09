@@ -259,13 +259,23 @@ st.markdown("---")
 
 # Configuration based on data source
 if data_source == "local":
-    st.subheader("2️⃣ Local Data Configuration")
+    st.subheader("2️⃣ Upload CSV Data")
+    
+    # Detect environment
+    env_helper = EnvHelper()
+    is_production = os.environ.get("WEBSITE_SITE_NAME") is not None  # Azure App Service sets this
     
     st.markdown("### 📤 Upload CSV File")
+    
+    if is_production:
+        st.info("🌐 **Production Mode**: CSV will be uploaded to Azure Blob Storage")
+    else:
+        st.info("💻 **Local Mode**: CSV will be saved to the data/ folder")
+    
     uploaded_file = st.file_uploader(
         "Upload a CSV file to use as your data source",
         type=["csv"],
-        help="Upload a CSV file with headers. The file will be saved to the data/ folder."
+        help="Upload a CSV file with headers. Max recommended size: 50MB"
     )
     
     if uploaded_file is not None:
@@ -281,26 +291,53 @@ if data_source == "local":
             
             # Reset file position for saving
             uploaded_file.seek(0)
+            file_size_mb = len(uploaded_file.getvalue()) / (1024 * 1024)
+            st.write(f"**File size:** {file_size_mb:.1f} MB")
             
             # Save button
             col1, col2 = st.columns([1, 3])
             with col1:
-                if st.button("💾 Save CSV to data/", type="primary"):
-                    import os
-                    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")
-                    os.makedirs(data_dir, exist_ok=True)
+                if st.button("💾 Upload & Save", type="primary"):
+                    uploaded_file.seek(0)
+                    file_bytes = uploaded_file.getvalue()
                     
-                    # Save file
-                    file_path = os.path.join(data_dir, uploaded_file.name)
-                    with open(file_path, "wb") as f:
-                        f.write(uploaded_file.getvalue())
-                    
-                    st.success(f"✅ Saved to `{file_path}`")
-                    st.info("Restart the application to load the new data.")
-                    
-                    # Update config
-                    config.setdefault("local", {})["csv_path"] = file_path
-                    config["local"]["uploaded_file"] = uploaded_file.name
+                    if is_production:
+                        # Upload to Azure Blob Storage
+                        try:
+                            blob_client = AzureBlobStorageClient(container_name="salesdata")
+                            blob_url = blob_client.upload_file(
+                                file_bytes,
+                                f"csv/{uploaded_file.name}",
+                                content_type="text/csv"
+                            )
+                            st.success(f"✅ Uploaded to Azure Blob Storage!")
+                            st.code(f"salesdata/csv/{uploaded_file.name}")
+                            
+                            # Update config
+                            config.setdefault("local", {})["blob_path"] = f"csv/{uploaded_file.name}"
+                            config["local"]["uploaded_file"] = uploaded_file.name
+                            save_db_config(config)
+                            
+                            st.info("The app will use this CSV on next restart.")
+                        except Exception as e:
+                            st.error(f"Upload failed: {e}")
+                            logger.exception("Blob upload failed")
+                    else:
+                        # Save locally
+                        data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")
+                        os.makedirs(data_dir, exist_ok=True)
+                        
+                        file_path = os.path.join(data_dir, uploaded_file.name)
+                        with open(file_path, "wb") as f:
+                            f.write(file_bytes)
+                        
+                        st.success(f"✅ Saved to `data/{uploaded_file.name}`")
+                        
+                        # Update config
+                        config.setdefault("local", {})["csv_path"] = file_path
+                        config["local"]["uploaded_file"] = uploaded_file.name
+                        
+                    st.info("⚠️ Restart the application to load the new data.")
                     
         except Exception as e:
             st.error(f"Error reading CSV: {e}")
@@ -308,26 +345,35 @@ if data_source == "local":
     st.markdown("---")
     st.markdown("### 📁 Current Data Files")
     
-    # Show existing files in data/ folder
-    import os
-    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")
-    if os.path.isdir(data_dir):
-        csv_files = [f for f in os.listdir(data_dir) if f.endswith('.csv')]
-        if csv_files:
-            for f in csv_files:
-                file_path = os.path.join(data_dir, f)
-                size_mb = os.path.getsize(file_path) / (1024 * 1024)
-                
-                # Count rows
-                try:
-                    import subprocess
-                    result = subprocess.run(['wc', '-l', file_path], capture_output=True, text=True)
-                    rows = int(result.stdout.split()[0])
-                except:
-                    rows = "?"
-                
-                st.write(f"- **{f}** ({size_mb:.1f} MB, {rows} rows)")
-        else:
+    if is_production:
+        # Show files in blob storage
+        try:
+            blob_client = AzureBlobStorageClient(container_name="salesdata")
+            st.write("**Files in Azure Blob Storage (salesdata/csv/):**")
+            # Note: listing blobs would require additional method
+            st.write("- Check Azure Portal for uploaded files")
+        except Exception as e:
+            st.warning(f"Could not list blob files: {e}")
+    else:
+        # Show existing files in data/ folder
+        data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")
+        if os.path.isdir(data_dir):
+            csv_files = [f for f in os.listdir(data_dir) if f.endswith('.csv')]
+            if csv_files:
+                for f in csv_files:
+                    file_path = os.path.join(data_dir, f)
+                    size_mb = os.path.getsize(file_path) / (1024 * 1024)
+                    
+                    # Count rows
+                    try:
+                        import subprocess
+                        result = subprocess.run(['wc', '-l', file_path], capture_output=True, text=True)
+                        rows = int(result.stdout.split()[0])
+                    except:
+                        rows = "?"
+                    
+                    st.write(f"- **{f}** ({size_mb:.1f} MB, {rows} rows)")
+            else:
             st.write("No CSV files found in data/ folder")
     
     st.success("✅ Local mode is ready! CSV files in data/ folder are automatically loaded.")
