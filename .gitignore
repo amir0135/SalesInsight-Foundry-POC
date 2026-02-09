@@ -3,6 +3,13 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/main/VisualStudio.gitignore
 
+# Data files - don't commit real production data to git
+# Keep sample_data.csv for demos, but ignore real exports
+data/*.csv
+!data/sample_data.csv
+data/*.xlsx
+data/*.pdf
+
 # generated frontend files
 code/dist/
 code/frontend/coverage
