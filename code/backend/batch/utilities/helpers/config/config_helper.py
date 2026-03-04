@@ -69,7 +69,8 @@ class Config:
             "jpg",
             "png",
             "docx",
-            "json"
+            "json",
+            "csv",
         }
         if self.env_helper.USE_ADVANCED_IMAGE_PROCESSING:
             document_types.update(ADVANCED_IMAGE_PROCESSING_FILE_TYPES)
