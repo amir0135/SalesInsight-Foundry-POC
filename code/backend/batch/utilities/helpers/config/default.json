@@ -153,6 +153,6 @@
   "orchestrator": {
     "strategy": "${ORCHESTRATION_STRATEGY}"
   },
-  "enable_chat_history": true,
+  "enable_chat_history": false,
   "database_type": "${DATABASE_TYPE}"
 }

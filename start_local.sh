@@ -20,6 +20,7 @@ set -e
 # Parse command line arguments
 SKIP_AZURE=false
 SKIP_DEPS=false
+FULL_MODE=false
 for arg in "$@"; do
     case $arg in
         --skip-azure)
@@ -36,8 +37,34 @@ for arg in "$@"; do
             SKIP_DEPS=true
             shift
             ;;
+        --full)
+            # Force full mode even if deps exist
+            FULL_MODE=true
+            shift
+            ;;
     esac
 done
+
+# Auto-detect fast mode: if .venv exists and deps were installed, use fast defaults
+# Use --full to override this behavior
+AZURE_CACHE=".venv/.azure_configured"
+if [ "$FULL_MODE" = false ] && [ -d ".venv" ] && [ -f ".venv/.deps_installed" ]; then
+    if [ "$SKIP_AZURE" = false ] && [ "$SKIP_DEPS" = false ]; then
+        SKIP_DEPS=true
+        # Also skip Azure if configured within last 4 hours (policies reset daily)
+        if [ -f "$AZURE_CACHE" ]; then
+            CACHE_AGE=$(( $(date +%s) - $(stat -f %m "$AZURE_CACHE" 2>/dev/null || echo 0) ))
+            if [ "$CACHE_AGE" -lt 14400 ]; then  # 4 hours = 14400 seconds
+                SKIP_AZURE=true
+                echo -e "${YELLOW}[Auto] Fast mode: skipping deps + Azure (configured ${CACHE_AGE}s ago). Use --full for complete startup.${NC}"
+            else
+                echo -e "${YELLOW}[Auto] Fast mode: skipping deps. Azure config may be stale, rechecking...${NC}"
+            fi
+        else
+            echo -e "${YELLOW}[Auto] Fast mode: skipping deps. Use --full for complete startup.${NC}"
+        fi
+    fi
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -129,63 +156,8 @@ if [ "$SKIP_AZURE" = false ]; then
     refresh_azure_credentials
 fi
 
-# =============================================================================
-# Azure Storage Account Configuration
-# =============================================================================
-# Ensures storage account is accessible for local development.
-# Settings may reset daily due to Azure policies, so this runs on every startup.
-
-configure_azure_storage() {
-    echo -e "${BLUE}[Azure Storage] Configuring storage account for local access...${NC}"
-
-    # Get storage account name from .env
-    STORAGE_ACCOUNT=$(grep -E "^AZURE_BLOB_ACCOUNT_NAME=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || echo "")
-    RESOURCE_GROUP=$(grep -E "^AZURE_RESOURCE_GROUP=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || echo "")
-
-    if [ -z "$STORAGE_ACCOUNT" ]; then
-        echo -e "${YELLOW}  ⚠ AZURE_BLOB_ACCOUNT_NAME not found in .env, skipping storage config${NC}"
-        return 0
-    fi
-
-    # Try to infer resource group if not set
-    if [ -z "$RESOURCE_GROUP" ]; then
-        # Try to get it from Azure
-        RESOURCE_GROUP=$(az storage account list --query "[?name=='$STORAGE_ACCOUNT'].resourceGroup" -o tsv 2>/dev/null || echo "")
-    fi
-
-    if [ -z "$RESOURCE_GROUP" ]; then
-        echo -e "${YELLOW}  ⚠ Could not determine resource group for storage account${NC}"
-        return 0
-    fi
-
-    # Check and enable public network access if disabled
-    PUBLIC_ACCESS=$(az storage account show -n "$STORAGE_ACCOUNT" -g "$RESOURCE_GROUP" --query "publicNetworkAccess" -o tsv 2>/dev/null || echo "")
-
-    if [ "$PUBLIC_ACCESS" = "Disabled" ]; then
-        echo -e "${YELLOW}  Public network access is disabled, enabling for local dev...${NC}"
-        if az storage account update -n "$STORAGE_ACCOUNT" -g "$RESOURCE_GROUP" --public-network-access Enabled > /dev/null 2>&1; then
-            echo -e "${GREEN}  ✓ Public network access enabled${NC}"
-        else
-            echo -e "${RED}  ✗ Failed to enable public network access${NC}"
-            echo -e "${YELLOW}    You may need to enable it manually in Azure Portal${NC}"
-        fi
-    else
-        echo -e "${GREEN}  ✓ Public network access is enabled${NC}"
-    fi
-
-    # Verify RBAC roles for current user (informational only)
-    USER_ID=$(az ad signed-in-user show --query id -o tsv 2>/dev/null || echo "")
-    if [ -n "$USER_ID" ]; then
-        ROLES=$(az role assignment list --assignee "$USER_ID" --scope "/subscriptions/$(az account show --query id -o tsv)/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$STORAGE_ACCOUNT" --query "[].roleDefinitionName" -o tsv 2>/dev/null | tr '\n' ', ' || echo "")
-        if [ -n "$ROLES" ]; then
-            echo -e "${GREEN}  ✓ Your storage roles: ${ROLES%,}${NC}"
-        fi
-    fi
-}
-
-if [ "$SKIP_AZURE" = false ]; then
-    configure_azure_storage
-fi
+# Azure Storage and Cosmos DB configuration functions are defined later
+# They handle daily policy resets automatically
 
 # =============================================================================
 # Python Environment Setup
@@ -450,16 +422,25 @@ configure_azure_storage() {
     echo -e "${BLUE}  Storage Account: $STORAGE_ACCOUNT${NC}"
     echo -e "${BLUE}  Resource Group: $RESOURCE_GROUP${NC}"
 
-    # 1. Enable public network access on storage account
-    echo -e "${YELLOW}  Enabling public network access on storage account...${NC}"
-    timeout 30 az storage account update \
+    # 1. Check and enable public network access on storage account (check first to avoid slow updates)
+    CURRENT_ACCESS=$(timeout 15 az storage account show \
         --name "$STORAGE_ACCOUNT" \
         --resource-group "$RESOURCE_GROUP" \
-        --public-network-access Enabled \
-        --default-action Allow \
-        --output none 2>/dev/null && \
-        echo -e "${GREEN}  ✓ Public network access enabled${NC}" || \
-        echo -e "${YELLOW}  ⚠ Could not update network access (may already be enabled or insufficient permissions)${NC}"
+        --query "publicNetworkAccess" -o tsv 2>/dev/null || echo "")
+
+    if [ "$CURRENT_ACCESS" = "Enabled" ]; then
+        echo -e "${GREEN}  ✓ Public network access already enabled${NC}"
+    else
+        echo -e "${YELLOW}  Enabling public network access on storage account...${NC}"
+        timeout 30 az storage account update \
+            --name "$STORAGE_ACCOUNT" \
+            --resource-group "$RESOURCE_GROUP" \
+            --public-network-access Enabled \
+            --default-action Allow \
+            --output none 2>/dev/null && \
+            echo -e "${GREEN}  ✓ Public network access enabled${NC}" || \
+            echo -e "${YELLOW}  ⚠ Could not update network access (insufficient permissions)${NC}"
+    fi
 
     # 2. Ensure current user has Storage Blob Data Contributor role
     echo -e "${YELLOW}  Checking Storage Blob role assignments...${NC}"
@@ -563,25 +544,35 @@ configure_cosmos_db() {
     echo -e "${BLUE}  Cosmos DB Account: $COSMOS_ACCOUNT${NC}"
     echo -e "${BLUE}  Resource Group: $RESOURCE_GROUP${NC}"
 
-    # Enable public network access on Cosmos DB (policies may disable this daily)
-    echo -e "${YELLOW}  Enabling public network access on Cosmos DB...${NC}"
-    for attempt in 1 2 3; do
-        if timeout 90 az cosmosdb update \
-            --name "$COSMOS_ACCOUNT" \
-            --resource-group "$RESOURCE_GROUP" \
-            --public-network-access ENABLED \
-            --output none 2>/dev/null; then
-            echo -e "${GREEN}  ✓ Public network access enabled${NC}"
-            break
-        else
-            if [ $attempt -lt 3 ]; then
-                echo -e "${YELLOW}  ⚠ Retry $attempt/3 - waiting for Cosmos DB lock...${NC}"
-                sleep 15
+    # Check current public network access status FIRST (fast check)
+    CURRENT_ACCESS=$(timeout 15 az cosmosdb show \
+        --name "$COSMOS_ACCOUNT" \
+        --resource-group "$RESOURCE_GROUP" \
+        --query "publicNetworkAccess" -o tsv 2>/dev/null || echo "")
+
+    if [ "$CURRENT_ACCESS" = "Enabled" ]; then
+        echo -e "${GREEN}  ✓ Public network access already enabled${NC}"
+    else
+        # Enable public network access on Cosmos DB (policies may disable this daily)
+        echo -e "${YELLOW}  Enabling public network access on Cosmos DB...${NC}"
+        for attempt in 1 2; do
+            if timeout 45 az cosmosdb update \
+                --name "$COSMOS_ACCOUNT" \
+                --resource-group "$RESOURCE_GROUP" \
+                --public-network-access ENABLED \
+                --output none 2>/dev/null; then
+                echo -e "${GREEN}  ✓ Public network access enabled${NC}"
+                break
             else
-                echo -e "${YELLOW}  ⚠ Could not enable public access (may need manual action in Azure Portal)${NC}"
+                if [ $attempt -lt 2 ]; then
+                    echo -e "${YELLOW}  ⚠ Retry $attempt/2 - waiting for Cosmos DB lock...${NC}"
+                    sleep 5
+                else
+                    echo -e "${YELLOW}  ⚠ Could not enable public access (may need manual action in Azure Portal)${NC}"
+                fi
             fi
-        fi
-    done
+        done
+    fi
 
     # Get current user ID
     CURRENT_USER_ID=$(timeout 15 az ad signed-in-user show --query id -o tsv 2>/dev/null || true)
@@ -638,11 +629,13 @@ configure_cosmos_db() {
 
 # Run Azure configuration (unless --skip-azure flag is passed)
 if [ "$SKIP_AZURE" = true ]; then
-    echo -e "${YELLOW}[Azure] Skipping Azure configuration (--skip-azure flag)${NC}"
+    echo -e "${YELLOW}[Azure] Skipping Azure configuration (cached or --skip-azure flag)${NC}"
     echo ""
 else
     configure_azure_storage
     configure_cosmos_db
+    # Cache successful Azure config timestamp
+    touch "$AZURE_CACHE" 2>/dev/null || true
 fi
 
 # Check if PostgreSQL container is running (for Database/Redshift testing)
@@ -724,13 +717,8 @@ else
     echo -e "${GREEN}✓ PostgreSQL container already running${NC}"
 fi
 
-# Kill any existing processes on our ports (in parallel for speed)
-echo -e "${YELLOW}Cleaning up existing processes...${NC}"
-(lsof -ti:5050 | xargs kill -9 2>/dev/null || true) &
-(lsof -ti:5173 | xargs kill -9 2>/dev/null || true) &
-(lsof -ti:8501 | xargs kill -9 2>/dev/null || true) &
-(lsof -ti:7071 | xargs kill -9 2>/dev/null || true) &
-wait
+# Kill any existing processes on our ports (quick cleanup)
+for port in 5050 5173 8501 7071; do lsof -ti:$port | xargs kill -9 2>/dev/null || true; done &
 
 # Export environment variables for Database/Redshift
 export USE_REDSHIFT=true
@@ -742,6 +730,12 @@ export REDSHIFT_PASSWORD=$POSTGRES_PASSWORD
 
 # Activate virtual environment
 source .venv/bin/activate
+
+# Load all environment variables from .env file
+echo -e "${BLUE}[Env] Loading environment variables from .env${NC}"
+set -a  # automatically export all variables
+source .env
+set +a
 
 # Ensure we use the venv's Python explicitly (not shell aliases)
 VENV_PYTHON="$SCRIPT_DIR/.venv/bin/python"
@@ -763,16 +757,6 @@ echo -e "${GREEN}Starting Vite frontend on http://localhost:5173${NC}"
 cd code/frontend
 nohup npm run dev > /tmp/vite.log 2>&1 &
 VITE_PID=$!
-
-# Quick check if Vite crashed immediately (e.g., rollup issue)
-sleep 2
-if ! kill -0 $VITE_PID 2>/dev/null; then
-    echo -e "${YELLOW}  Vite crashed, attempting to fix dependencies...${NC}"
-    rm -rf node_modules package-lock.json
-    npm install > /dev/null 2>&1
-    nohup npm run dev > /tmp/vite.log 2>&1 &
-    VITE_PID=$!
-fi
 cd ../..
 
 # Start Streamlit Admin UI on port 8501 (parallel)
@@ -789,10 +773,10 @@ nohup func host start --port 7071 > /tmp/functions.log 2>&1 &
 FUNC_PID=$!
 cd ../../..
 
-# Wait for all services to start (single combined wait instead of multiple sleeps)
+# Wait for all services to start (brief wait)
 echo ""
-echo -e "${YELLOW}Waiting for services to initialize...${NC}"
-sleep 5
+echo -e "${YELLOW}Starting services...${NC}"
+sleep 2
 
 # Check all services at once
 echo -e "${BLUE}--- Service Status ---${NC}"
@@ -809,7 +793,7 @@ echo -e "${GREEN}║${NC} Chat UI (Frontend):  ${BLUE}http://localhost:5173${NC}
 echo -e "${GREEN}║${NC} Chat API (Backend):  ${BLUE}http://localhost:5050${NC}                ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC} Admin UI:            ${BLUE}http://localhost:8501${NC}                ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC} Azure Functions:     ${BLUE}http://localhost:7071${NC}                ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC} PostgreSQL:          localhost:5432 (database_test)     ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC} PostgreSQL:          localhost:${POSTGRES_PORT} (${POSTGRES_DB})      ${GREEN}║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${YELLOW}Logs:${NC}"
@@ -827,7 +811,8 @@ echo "  • Database: Ask database queries like 'Show errors from last 7 days'"
 echo "  • /database <query>: Force direct database query (bypasses LLM)"
 echo ""
 echo -e "${BLUE}Startup Options:${NC}"
-echo "  ./start_local.sh              # Full startup (first run, or after updates)"
+echo "  ./start_local.sh              # Auto-fast mode (skips deps if already installed)"
+echo "  ./start_local.sh --full       # Full startup (first run, or after updates)"
 echo "  ./start_local.sh --skip-azure # Skip Azure policy auto-fix"
-echo "  ./start_local.sh --skip-deps  # Skip dependency check (faster)"
+echo "  ./start_local.sh --skip-deps  # Skip dependency check"
 echo "  ./start_local.sh --fast       # Skip both Azure + deps (fastest)"
