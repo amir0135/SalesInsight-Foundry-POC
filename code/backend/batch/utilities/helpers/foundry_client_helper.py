@@ -1,20 +1,19 @@
 """
 Azure AI Foundry client helper.
 
-Provides a centralized wrapper around AIProjectClient for:
-- Chat completions (routed through Foundry's connected AIServices)
-- Embeddings generation
-- Agent Service access (threads, messages, runs)
-- Tracing / telemetry configuration
+Provides a centralized wrapper around:
+- AzureOpenAI for chat completions and embeddings (backward compatible)
+- AgentsClient (azure-ai-agents SDK) for Agent Service operations:
+  threads, messages, runs, and tool-calling
 """
 
 import logging
-from functools import lru_cache
 from typing import List, Optional, Union
 
-from azure.ai.projects import AIProjectClient
-from azure.ai.projects.models import (
-    AgentsApiResponseFormatMode,
+from azure.ai.agents import AgentsClient
+from azure.ai.agents.models import (
+    FunctionToolDefinition,
+    ToolOutput,
 )
 from openai import AzureOpenAI
 
@@ -46,47 +45,34 @@ class FoundryClientHelper:
             self.env_helper.MANAGED_IDENTITY_CLIENT_ID
         )
 
-        # Build the project endpoint from the resource group + project name
-        # Format: https://<location>.api.azureml.ms/
-        # The AIProjectClient needs the full connection string or endpoint
-        self._project_client: Optional[AIProjectClient] = None
+        self._agents_client: Optional[AgentsClient] = None
         self._openai_client: Optional[AzureOpenAI] = None
 
         logger.info("FoundryClientHelper initialized")
 
     @property
-    def project_client(self) -> AIProjectClient:
-        """Lazily create and return the AIProjectClient."""
-        if self._project_client is None:
+    def agents_client(self) -> AgentsClient:
+        """
+        Lazily create and return the AgentsClient from azure-ai-agents.
+
+        Endpoint format expected by the SDK:
+        https://<aiservices-id>.services.ai.azure.com/api/projects/<project-name>
+        """
+        if self._agents_client is None:
             endpoint = self.env_helper.AZURE_OPENAI_ENDPOINT
-            subscription_id = self.env_helper.AZURE_SUBSCRIPTION_ID
-            resource_group = self.env_helper.AZURE_RESOURCE_GROUP
             project_name = self.env_helper.AZURE_AI_PROJECT_NAME
 
-            logger.info(
-                "Creating AIProjectClient for project=%s in rg=%s",
-                project_name,
-                resource_group,
-            )
+            # Build the Foundry project endpoint if not already in the right form
+            if project_name and "/api/projects/" not in endpoint:
+                endpoint = endpoint.rstrip("/")
+                endpoint = f"{endpoint}/api/projects/{project_name}"
 
-            self._project_client = AIProjectClient(
-                credential=self._credential,
+            logger.info("Creating AgentsClient for endpoint=%s", endpoint)
+            self._agents_client = AgentsClient(
                 endpoint=endpoint,
-                subscription_id=subscription_id,
-                resource_group_name=resource_group,
-                project_name=project_name,
+                credential=self._credential,
             )
-        return self._project_client
-
-    @property
-    def inference_client(self):
-        """Get the inference client from AIProjectClient for chat/embeddings."""
-        return self.project_client.inference
-
-    @property
-    def agents_client(self):
-        """Get the agents client for Foundry Agent Service operations."""
-        return self.project_client.agents
+        return self._agents_client
 
     def get_openai_client(self) -> AzureOpenAI:
         """
@@ -155,42 +141,46 @@ class FoundryClientHelper:
             .embedding
         )
 
-    # ---- Agent Service helpers ---- #
+    # ---- Agent Service helpers (azure-ai-agents SDK) ---- #
 
     def create_agent(
         self,
         name: str,
         instructions: str,
         model: str | None = None,
-        tools: list | None = None,
+        tools: list[FunctionToolDefinition] | None = None,
         tool_resources: dict | None = None,
     ):
         """
         Create a Foundry Agent with the given configuration.
-        Returns the agent object.
+        Returns the Agent object.
         """
         model = model or self.env_helper.AZURE_OPENAI_MODEL
         logger.info("Creating Foundry agent: %s with model: %s", name, model)
 
-        agent = self.agents_client.create_agent(
+        kwargs: dict = dict(
             model=model,
             name=name,
             instructions=instructions,
-            tools=tools or [],
-            tool_resources=tool_resources or {},
         )
+        if tools:
+            kwargs["tools"] = tools
+        if tool_resources:
+            kwargs["tool_resources"] = tool_resources
+
+        agent = self.agents_client.create_agent(**kwargs)
         logger.info("Created agent id=%s", agent.id)
         return agent
 
     def create_thread(self):
         """Create a new conversation thread."""
-        thread = self.agents_client.create_thread()
+        thread = self.agents_client.threads.create()
         logger.info("Created thread id=%s", thread.id)
         return thread
 
     def add_message(self, thread_id: str, role: str, content: str):
         """Add a message to a thread."""
-        return self.agents_client.create_message(
+        return self.agents_client.messages.create(
             thread_id=thread_id,
             role=role,
             content=content,
@@ -199,9 +189,9 @@ class FoundryClientHelper:
     def run_agent(self, thread_id: str, agent_id: str):
         """
         Start a run on a thread with the given agent.
-        Returns the run object (may need polling for completion).
+        Returns the ThreadRun object (may need polling for completion).
         """
-        run = self.agents_client.create_run(
+        run = self.agents_client.runs.create(
             thread_id=thread_id,
             agent_id=agent_id,
         )
@@ -209,17 +199,17 @@ class FoundryClientHelper:
         return run
 
     def get_run(self, thread_id: str, run_id: str):
-        """Get the status of a run."""
-        return self.agents_client.get_run(
+        """Get the current status of a run."""
+        return self.agents_client.runs.get(
             thread_id=thread_id,
             run_id=run_id,
         )
 
     def submit_tool_outputs(
-        self, thread_id: str, run_id: str, tool_outputs: list[dict]
+        self, thread_id: str, run_id: str, tool_outputs: list[ToolOutput]
     ):
         """Submit tool call results back to the agent run."""
-        return self.agents_client.submit_tool_outputs_to_run(
+        return self.agents_client.runs.submit_tool_outputs(
             thread_id=thread_id,
             run_id=run_id,
             tool_outputs=tool_outputs,
@@ -227,7 +217,14 @@ class FoundryClientHelper:
 
     def get_messages(self, thread_id: str):
         """Get all messages in a thread."""
-        return self.agents_client.list_messages(thread_id=thread_id)
+        return self.agents_client.messages.list(thread_id=thread_id)
+
+    def get_last_assistant_text(self, thread_id: str) -> str:
+        """Get the text of the last assistant message in a thread."""
+        return self.agents_client.messages.get_last_message_text_by_role(
+            thread_id=thread_id,
+            role="assistant",
+        )
 
     def cleanup_agent(self, agent_id: str):
         """Delete an agent when no longer needed."""

@@ -1,16 +1,24 @@
 """
 Foundry Agent Orchestrator.
 
-Uses Azure AI Foundry's Agent Service to manage conversation threads and
-tool-calling. The agent is created with function tool definitions that mirror
-the existing ChatPlugin/DatabaseChatPlugin tools, but the tool execution
-happens locally (preserving NL2SQL, document search, etc.).
+Uses Azure AI Foundry's Agent Service (azure-ai-agents SDK) to manage
+conversation threads and tool-calling. The agent is created with function
+tool definitions that mirror the existing ChatPlugin/DatabaseChatPlugin
+tools, but the tool execution happens locally (preserving NL2SQL, document
+search, etc.).
 """
 
 import json
 import logging
 import os
 import time as timing_module
+
+from azure.ai.agents.models import (
+    FunctionToolDefinition,
+    FunctionDefinition,
+    RunStatus,
+    ToolOutput,
+)
 
 from ..common.answer import Answer
 from ..helpers.llm_helper import LLMHelper
@@ -22,18 +30,18 @@ from .orchestrator_base import OrchestratorBase
 logger = logging.getLogger(__name__)
 
 
-def _build_tool_definitions() -> list[dict]:
+def _build_tool_definitions() -> list[FunctionToolDefinition]:
     """
     Build the list of function tool definitions for the Foundry agent.
     Mirrors the tools defined in ChatPlugin / DatabaseChatPlugin.
+    Uses the azure-ai-agents FunctionToolDefinition model.
     """
-    tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": "search_documents",
-                "description": "Provide answers to any fact question coming from users by searching uploaded documents.",
-                "parameters": {
+    tools: list[FunctionToolDefinition] = [
+        FunctionToolDefinition(
+            function=FunctionDefinition(
+                name="search_documents",
+                description="Provide answers to any fact question coming from users by searching uploaded documents.",
+                parameters={
                     "type": "object",
                     "properties": {
                         "question": {
@@ -43,14 +51,13 @@ def _build_tool_definitions() -> list[dict]:
                     },
                     "required": ["question"],
                 },
-            },
-        },
-        {
-            "type": "function",
-            "function": {
-                "name": "text_processing",
-                "description": "Useful when you want to apply a transformation on the text, like translate, summarize, rephrase and so on.",
-                "parameters": {
+            )
+        ),
+        FunctionToolDefinition(
+            function=FunctionDefinition(
+                name="text_processing",
+                description="Useful when you want to apply a transformation on the text, like translate, summarize, rephrase and so on.",
+                parameters={
                     "type": "object",
                     "properties": {
                         "text": {
@@ -64,24 +71,23 @@ def _build_tool_definitions() -> list[dict]:
                     },
                     "required": ["text", "operation"],
                 },
-            },
-        },
+            )
+        ),
     ]
 
     # Add database tools if enabled
     if os.getenv("USE_REDSHIFT", "false").lower() == "true":
         tools.extend(
             [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "query_database",
-                        "description": (
+                FunctionToolDefinition(
+                    function=FunctionDefinition(
+                        name="query_database",
+                        description=(
                             "Query the operational database. Use for questions about "
                             "errors, disconnections, connections, facilities, counts, totals, "
                             "top N, averages, sums. Generates SQL and returns database results."
                         ),
-                        "parameters": {
+                        parameters={
                             "type": "object",
                             "properties": {
                                 "question": {
@@ -96,14 +102,13 @@ def _build_tool_definitions() -> list[dict]:
                             },
                             "required": ["question"],
                         },
-                    },
-                },
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "analyze_database",
-                        "description": "Deep analysis of database data. Use for facility health assessment, comparing multiple facilities, trend analysis, or correlating errors with connectivity issues.",
-                        "parameters": {
+                    )
+                ),
+                FunctionToolDefinition(
+                    function=FunctionDefinition(
+                        name="analyze_database",
+                        description="Deep analysis of database data. Use for facility health assessment, comparing multiple facilities, trend analysis, or correlating errors with connectivity issues.",
+                        parameters={
                             "type": "object",
                             "properties": {
                                 "analysis_type": {
@@ -139,8 +144,8 @@ def _build_tool_definitions() -> list[dict]:
                             },
                             "required": ["analysis_type"],
                         },
-                    },
-                },
+                    )
+                ),
             ]
         )
 
@@ -336,35 +341,32 @@ class FoundryAgentOrchestrator(OrchestratorBase):
         for _ in range(max_polls):
             run = self._foundry_helper.get_run(thread.id, run.id)
 
-            if run.status == "completed":
+            if run.status == RunStatus.COMPLETED:
                 timings["agent_run"] = timing_module.perf_counter() - step_start
                 # Extract the assistant's response
-                messages = self._foundry_helper.get_messages(thread.id)
-                # Get the last assistant message
-                for msg in reversed(messages.data):
-                    if msg.role == "assistant":
-                        answer_text = msg.content[0].text.value if msg.content else ""
-                        answer = Answer(
-                            question=user_message,
-                            answer=answer_text,
-                            source_documents=(
-                                tool_answer.source_documents if tool_answer else []
-                            ),
-                            prompt_tokens=getattr(
-                                run.usage, "prompt_tokens", 0
-                            )
-                            if run.usage
-                            else 0,
-                            completion_tokens=getattr(
-                                run.usage, "completion_tokens", 0
-                            )
-                            if run.usage
-                            else 0,
-                        )
-                        break
+                answer_text = self._foundry_helper.get_last_assistant_text(
+                    thread.id
+                )
+                answer = Answer(
+                    question=user_message,
+                    answer=answer_text or "",
+                    source_documents=(
+                        tool_answer.source_documents if tool_answer else []
+                    ),
+                    prompt_tokens=getattr(
+                        run.usage, "prompt_tokens", 0
+                    )
+                    if run.usage
+                    else 0,
+                    completion_tokens=getattr(
+                        run.usage, "completion_tokens", 0
+                    )
+                    if run.usage
+                    else 0,
+                )
                 break
 
-            elif run.status == "requires_action":
+            elif run.status == RunStatus.REQUIRES_ACTION:
                 timings["agent_tool_selection"] = (
                     timing_module.perf_counter() - step_start
                 )
@@ -390,10 +392,10 @@ class FoundryAgentOrchestrator(OrchestratorBase):
                     )
 
                     tool_outputs.append(
-                        {
-                            "tool_call_id": tool_call.id,
-                            "output": tool_answer.answer,
-                        }
+                        ToolOutput(
+                            tool_call_id=tool_call.id,
+                            output=tool_answer.answer,
+                        )
                     )
 
                 timings["tool_execution"] = timing_module.perf_counter() - step_start
@@ -404,7 +406,11 @@ class FoundryAgentOrchestrator(OrchestratorBase):
                     thread.id, run.id, tool_outputs
                 )
 
-            elif run.status in ("failed", "cancelled", "expired"):
+            elif run.status in (
+                RunStatus.FAILED,
+                RunStatus.CANCELLED,
+                RunStatus.EXPIRED,
+            ):
                 logger.error("Agent run failed with status: %s", run.status)
                 answer = Answer(
                     question=user_message,
