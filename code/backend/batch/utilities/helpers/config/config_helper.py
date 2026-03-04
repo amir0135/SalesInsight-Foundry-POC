@@ -69,7 +69,8 @@ class Config:
             "jpg",
             "png",
             "docx",
-            "json"
+            "json",
+            "csv",
         }
         if self.env_helper.USE_ADVANCED_IMAGE_PROCESSING:
             document_types.update(ADVANCED_IMAGE_PROCESSING_FILE_TYPES)
@@ -254,21 +255,26 @@ class ConfigHelper:
 
             config_file_path = os.path.join(os.path.dirname(__file__), "default.json")
 
+            # Check env vars first, otherwise use database-type based defaults
+            log_user_interactions = os.environ.get("LOG_USER_INTERACTIONS", "").lower()
+            if log_user_interactions in ("true", "false"):
+                log_user_interactions_value = log_user_interactions == "true"
+            else:
+                log_user_interactions_value = env_helper.DATABASE_TYPE != DatabaseType.POSTGRESQL.value
+
+            log_tokens = os.environ.get("LOG_TOKENS", "").lower()
+            if log_tokens in ("true", "false"):
+                log_tokens_value = log_tokens == "true"
+            else:
+                log_tokens_value = env_helper.DATABASE_TYPE != DatabaseType.POSTGRESQL.value
+
             with open(config_file_path, encoding="utf-8") as f:
                 logger.info("Loading default config from %s", config_file_path)
                 ConfigHelper._default_config = json.loads(
                     Template(f.read()).substitute(
                         ORCHESTRATION_STRATEGY=env_helper.ORCHESTRATION_STRATEGY,
-                        LOG_USER_INTERACTIONS=(
-                            False
-                            if env_helper.DATABASE_TYPE == DatabaseType.POSTGRESQL.value
-                            else True
-                        ),
-                        LOG_TOKENS=(
-                            False
-                            if env_helper.DATABASE_TYPE == DatabaseType.POSTGRESQL.value
-                            else True
-                        ),
+                        LOG_USER_INTERACTIONS=log_user_interactions_value,
+                        LOG_TOKENS=log_tokens_value,
                         CONVERSATION_FLOW=env_helper.CONVERSATION_FLOW,
                         DATABASE_TYPE=env_helper.DATABASE_TYPE,
                     )
