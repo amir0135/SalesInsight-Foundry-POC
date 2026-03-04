@@ -6,3 +6,4 @@ class OrchestrationStrategy(Enum):
     LANGCHAIN = "langchain"
     SEMANTIC_KERNEL = "semantic_kernel"
     PROMPT_FLOW = "prompt_flow"
+    FOUNDRY_AGENT = "foundry_agent"

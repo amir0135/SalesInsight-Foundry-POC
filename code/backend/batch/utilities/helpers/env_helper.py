@@ -43,6 +43,12 @@ class EnvHelper:
         self.MANAGED_IDENTITY_CLIENT_ID = os.getenv("MANAGED_IDENTITY_CLIENT_ID", "")
         self.MANAGED_IDENTITY_RESOURCE_ID = os.getenv("MANAGED_IDENTITY_RESOURCE_ID", "")
 
+        # Azure AI Foundry
+        self.USE_FOUNDRY_CLIENT = self.get_env_var_bool(
+            "USE_FOUNDRY_CLIENT", "False"
+        )
+        self.AZURE_AI_PROJECT_NAME = os.getenv("AZURE_AI_PROJECT_NAME", "")
+
         # Azure Search
         self.AZURE_SEARCH_SERVICE = os.getenv("AZURE_SEARCH_SERVICE", "")
         self.AZURE_SEARCH_INDEX = os.getenv("AZURE_SEARCH_INDEX", "")

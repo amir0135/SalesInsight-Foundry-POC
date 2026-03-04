@@ -191,6 +191,7 @@ param azureOpenAIVisionModelCapacity int = 10
   'openai_function'
   'semantic_kernel'
   'langchain'
+  'foundry_agent'
 ])
 param orchestrationStrategy string = 'semantic_kernel'
 
@@ -300,6 +301,15 @@ var formRecognizerName string = 'di-${solutionSuffix}'
 
 @description('Azure Content Safety Name.')
 var contentSafetyName string = 'cs-${solutionSuffix}'
+
+@description('Azure AI Services (unified) Resource Name.')
+var aiServicesName string = 'ais-${solutionSuffix}'
+
+@description('Azure AI Foundry Hub Name.')
+var foundryHubName string = 'hub-${solutionSuffix}'
+
+@description('Azure AI Foundry Project Name.')
+var foundryProjectName string = 'proj-${solutionSuffix}'
 
 @description('Azure Speech Service Name.')
 var speechServiceName string = 'spch-${solutionSuffix}'
@@ -994,7 +1004,7 @@ module openai 'modules/core/ai/cognitiveservices.bicep' = {
     name: azureOpenAIResourceName
     location: location
     tags: allTags
-    kind: 'OpenAI'
+    kind: 'AIServices'
     sku: azureOpenAISkuName
     deployments: defaultOpenAiDeployments
     userAssignedResourceId: managedIdentityModule.outputs.resourceId
@@ -1291,6 +1301,9 @@ module web 'modules/app/web.bicep' = {
         AZURE_OPENAI_EMBEDDING_MODEL: azureOpenAIEmbeddingModel
         AZURE_OPENAI_EMBEDDING_MODEL_NAME: azureOpenAIEmbeddingModelName
         AZURE_OPENAI_EMBEDDING_MODEL_VERSION: azureOpenAIEmbeddingModelVersion
+        // Azure AI Foundry
+        AZURE_AI_PROJECT_NAME: foundryProjectName
+        USE_FOUNDRY_CLIENT: 'true'
         AZURE_SPEECH_SERVICE_NAME: speechServiceName
         AZURE_SPEECH_SERVICE_REGION: location
         AZURE_SPEECH_RECOGNIZER_LANGUAGES: recognizedLanguages
@@ -1399,6 +1412,9 @@ module adminweb 'modules/app/adminweb.bicep' = {
         AZURE_OPENAI_EMBEDDING_MODEL: azureOpenAIEmbeddingModel
         AZURE_OPENAI_EMBEDDING_MODEL_NAME: azureOpenAIEmbeddingModelName
         AZURE_OPENAI_EMBEDDING_MODEL_VERSION: azureOpenAIEmbeddingModelVersion
+        // Azure AI Foundry
+        AZURE_AI_PROJECT_NAME: foundryProjectName
+        USE_FOUNDRY_CLIENT: 'true'
 
         USE_ADVANCED_IMAGE_PROCESSING: useAdvancedImageProcessing ? 'true' : 'false'
         BACKEND_URL: 'https://${hostingModel == 'container' ? '${functionName}-docker' : functionName}.azurewebsites.net'
@@ -1506,6 +1522,9 @@ module function 'modules/app/function.bicep' = {
         AZURE_OPENAI_EMBEDDING_MODEL_VERSION: azureOpenAIEmbeddingModelVersion
         AZURE_OPENAI_RESOURCE: azureOpenAIResourceName
         AZURE_OPENAI_API_VERSION: azureOpenAIApiVersion
+        // Azure AI Foundry
+        AZURE_AI_PROJECT_NAME: foundryProjectName
+        USE_FOUNDRY_CLIENT: 'true'
 
         USE_ADVANCED_IMAGE_PROCESSING: useAdvancedImageProcessing ? 'true' : 'false'
         DOCUMENT_PROCESSING_QUEUE_NAME: queueName
@@ -1667,6 +1686,114 @@ module contentsafety 'modules/core/ai/cognitiveservices.bicep' = {
     )
   }
   dependsOn: enablePrivateNetworking ? avmPrivateDnsZones : []
+}
+
+// ============== //
+// Azure AI Foundry Hub + Project //
+// ============== //
+
+module foundryHub 'modules/machine-learning-services/workspace/ml_workspace.bicep' = {
+  name: take('module.foundry.hub.${foundryHubName}', 64)
+  scope: resourceGroup()
+  params: {
+    name: foundryHubName
+    friendlyName: '${solutionName} AI Foundry Hub'
+    location: location
+    tags: allTags
+    sku: 'Basic'
+    kind: 'Hub'
+    description: 'Azure AI Foundry Hub for ${solutionName}'
+    associatedStorageAccountResourceId: storage.outputs.resourceId
+    associatedKeyVaultResourceId: keyvault.outputs.resourceId
+    associatedApplicationInsightsResourceId: enableMonitoring ? monitoring!.outputs.applicationInsightsId : null
+    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
+    managedIdentities: {
+      systemAssigned: true
+      userAssignedResourceIds: [managedIdentityModule.outputs.resourceId]
+    }
+    enableTelemetry: enableTelemetry
+    diagnosticSettings: enableMonitoring
+      ? [{ workspaceResourceId: monitoring!.outputs.logAnalyticsWorkspaceId }]
+      : []
+    // Connect the Hub to the AIServices resource
+    connections: [
+      {
+        name: 'aiservices-connection'
+        category: 'AIServices'
+        target: openai.outputs.endpoint
+        connectionProperties: {
+          authType: 'AAD'
+        }
+      }
+    ]
+    roleAssignments: concat(
+      [
+        {
+          roleDefinitionIdOrName: 'Contributor'
+          principalId: managedIdentityModule.outputs.principalId
+          principalType: 'ServicePrincipal'
+        }
+      ],
+      !empty(principal.id)
+        ? [
+            {
+              roleDefinitionIdOrName: 'Contributor'
+              principalId: principal.id
+            }
+          ]
+        : []
+    )
+  }
+}
+
+module foundryProject 'modules/machine-learning-services/workspace/ml_workspace.bicep' = {
+  name: take('module.foundry.project.${foundryProjectName}', 64)
+  scope: resourceGroup()
+  params: {
+    name: foundryProjectName
+    friendlyName: '${solutionName} AI Project'
+    location: location
+    tags: allTags
+    sku: 'Basic'
+    kind: 'Project'
+    description: 'Azure AI Foundry Project for ${solutionName}'
+    hubResourceId: foundryHub.outputs.resourceId
+    publicNetworkAccess: enablePrivateNetworking ? 'Disabled' : 'Enabled'
+    managedIdentities: {
+      systemAssigned: true
+      userAssignedResourceIds: [managedIdentityModule.outputs.resourceId]
+    }
+    enableTelemetry: enableTelemetry
+    diagnosticSettings: enableMonitoring
+      ? [{ workspaceResourceId: monitoring!.outputs.logAnalyticsWorkspaceId }]
+      : []
+    roleAssignments: concat(
+      [
+        {
+          roleDefinitionIdOrName: 'Contributor'
+          principalId: managedIdentityModule.outputs.principalId
+          principalType: 'ServicePrincipal'
+        }
+        {
+          roleDefinitionIdOrName: 'AzureML Data Scientist'
+          principalId: managedIdentityModule.outputs.principalId
+          principalType: 'ServicePrincipal'
+        }
+      ],
+      !empty(principal.id)
+        ? [
+            {
+              roleDefinitionIdOrName: 'Contributor'
+              principalId: principal.id
+            }
+            {
+              roleDefinitionIdOrName: 'AzureML Data Scientist'
+              principalId: principal.id
+            }
+          ]
+        : []
+    )
+  }
 }
 
 // If advanced image processing is used, storage account already should be publicly accessible.
@@ -2113,3 +2240,15 @@ output OPEN_AI_FUNCTIONS_SYSTEM_PROMPT string = openAIFunctionsSystemPrompt
 
 @description('System prompt used by the Semantic Kernel orchestration.')
 output SEMANTIC_KERNEL_SYSTEM_PROMPT string = semanticKernelSystemPrompt
+
+@description('Azure AI Foundry Hub resource ID.')
+output AZURE_AI_HUB_RESOURCE_ID string = foundryHub.outputs.resourceId
+
+@description('Azure AI Foundry Project resource ID.')
+output AZURE_AI_PROJECT_RESOURCE_ID string = foundryProject.outputs.resourceId
+
+@description('Azure AI Foundry Project name.')
+output AZURE_AI_PROJECT_NAME string = foundryProjectName
+
+@description('Azure AI Services (unified) endpoint.')
+output AZURE_AI_SERVICES_ENDPOINT string = openai.outputs.endpoint

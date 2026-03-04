@@ -20,8 +20,13 @@ class LLMHelper:
         self.env_helper: EnvHelper = EnvHelper()
         self.auth_type_keys = self.env_helper.is_auth_type_keys()
         self.token_provider = self.env_helper.AZURE_TOKEN_PROVIDER
+        self.use_foundry = self.env_helper.USE_FOUNDRY_CLIENT
 
-        if self.auth_type_keys:
+        if self.use_foundry:
+            from .foundry_client_helper import FoundryClientHelper
+            self._foundry_helper = FoundryClientHelper()
+            self.openai_client = self._foundry_helper.get_openai_client()
+        elif self.auth_type_keys:
             self.openai_client = AzureOpenAI(
                 azure_endpoint=self.env_helper.AZURE_OPENAI_ENDPOINT,
                 api_version=self.env_helper.AZURE_OPENAI_API_VERSION,
@@ -43,6 +48,14 @@ class LLMHelper:
         self.embedding_model = self.env_helper.AZURE_OPENAI_EMBEDDING_MODEL
 
         logger.info("Initializing LLMHelper completed")
+
+    def get_foundry_helper(self):
+        """Get the FoundryClientHelper instance (only available when USE_FOUNDRY_CLIENT=true)."""
+        if not self.use_foundry:
+            raise RuntimeError(
+                "FoundryClientHelper not available — set USE_FOUNDRY_CLIENT=true"
+            )
+        return self._foundry_helper
 
     def get_llm(self):
         if self.auth_type_keys:

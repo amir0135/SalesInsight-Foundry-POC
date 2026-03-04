@@ -32,11 +32,14 @@ def configure_azure_ai_tracing() -> bool:
     This enables end-to-end tracing of LLM calls, tool invocations,
     and database queries in Azure AI Foundry portal.
 
+    When USE_FOUNDRY_CLIENT is enabled, also configures Foundry project-aware
+    tracing so spans appear in the Foundry portal's Tracing tab.
+
     Returns:
         bool: True if tracing was configured successfully
     """
     try:
-        _ = EnvHelper()  # Validate environment is configured
+        env_helper = EnvHelper()
 
         # Check if Application Insights is configured
         connection_string = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING", "")
@@ -57,6 +60,19 @@ def configure_azure_ai_tracing() -> bool:
 
         # Instrument HTTP client for OpenAI calls
         HTTPXClientInstrumentor().instrument()
+
+        # When Foundry is enabled, configure project-aware tracing
+        # so traces appear in the Foundry portal's Tracing tab
+        if env_helper.USE_FOUNDRY_CLIENT:
+            try:
+                from azure.ai.projects.telemetry import trace as foundry_trace
+
+                foundry_trace.enable()
+                logger.info("Foundry project-aware tracing enabled")
+            except ImportError:
+                logger.info("azure-ai-projects not installed, skipping Foundry tracing")
+            except Exception as e:
+                logger.warning(f"Foundry tracing setup failed (non-fatal): {e}")
 
         logger.info("Azure AI tracing configured successfully")
         return True
@@ -348,9 +364,23 @@ class SQLContentSafetyChecker:
         self._initialize_client()
 
     def _initialize_client(self):
-        """Initialize Azure Content Safety client."""
+        """Initialize Azure Content Safety client.
+
+        When USE_FOUNDRY_CLIENT is enabled, falls back to the AIServices
+        endpoint (which includes Content Safety capabilities) if no
+        dedicated content safety endpoint is configured.
+        """
         try:
             endpoint = os.getenv("AZURE_CONTENT_SAFETY_ENDPOINT", "")
+
+            # Fall back to AIServices endpoint when using Foundry
+            if not endpoint and self.env_helper.USE_FOUNDRY_CLIENT:
+                endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+                if endpoint:
+                    logger.info(
+                        "Using AIServices endpoint for Content Safety (Foundry mode)"
+                    )
+
             if not endpoint:
                 logger.info("Content Safety endpoint not configured")
                 return
