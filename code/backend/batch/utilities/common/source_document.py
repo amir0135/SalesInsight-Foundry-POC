@@ -103,11 +103,18 @@ class SourceDocument:
             filename = filename.split("/")[-1].split(".")[0]
         return filename
 
+    _blob_client = None
+
+    @classmethod
+    def _get_blob_client(cls):
+        if cls._blob_client is None:
+            cls._blob_client = AzureBlobStorageClient()
+        return cls._blob_client
+
     def get_markdown_url(self):
         url = quote(self.source, safe=":/")
         if "_SAS_TOKEN_PLACEHOLDER_" in url:
-            blob_client = AzureBlobStorageClient()
-            container_sas = blob_client.get_container_sas()
+            container_sas = self._get_blob_client().get_container_sas()
             url = url.replace("_SAS_TOKEN_PLACEHOLDER_", container_sas)
         return f"[{self.title}]({url})"
 

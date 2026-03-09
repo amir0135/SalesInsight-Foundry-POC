@@ -94,12 +94,19 @@ class NL2SQLGenerator:
         )
 
     def _create_openai_client(self) -> AzureOpenAI:
-        """Create Azure OpenAI client from environment configuration."""
-        return AzureOpenAI(
-            api_key=self.env_helper.AZURE_OPENAI_API_KEY,
-            api_version=self.env_helper.AZURE_OPENAI_API_VERSION,
-            azure_endpoint=self.env_helper.AZURE_OPENAI_ENDPOINT,
-        )
+        """Create Azure OpenAI client with key or RBAC authentication."""
+        if self.env_helper.is_auth_type_keys():
+            return AzureOpenAI(
+                api_key=self.env_helper.AZURE_OPENAI_API_KEY,
+                api_version=self.env_helper.AZURE_OPENAI_API_VERSION,
+                azure_endpoint=self.env_helper.AZURE_OPENAI_ENDPOINT,
+            )
+        else:
+            return AzureOpenAI(
+                azure_ad_token_provider=self.env_helper.AZURE_TOKEN_PROVIDER,
+                api_version=self.env_helper.AZURE_OPENAI_API_VERSION,
+                azure_endpoint=self.env_helper.AZURE_OPENAI_ENDPOINT,
+            )
 
     def generate(
         self,

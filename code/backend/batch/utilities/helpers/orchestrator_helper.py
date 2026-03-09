@@ -28,3 +28,28 @@ class Orchestrator:
         return await orchestrator_instance.handle_message(
             user_message, chat_history, conversation_id, force_database=force_database
         )
+
+    async def prepare_streaming(
+        self,
+        user_message: str,
+        chat_history: List[dict],
+        conversation_id: str,
+        orchestrator: OrchestrationSettings,
+        force_database: bool = False,
+        **kwargs: dict,
+    ) -> dict:
+        orchestrator_instance = get_orchestrator(orchestrator.strategy.value)
+        if orchestrator_instance is None:
+            raise Exception(
+                f"Unknown orchestration strategy: {orchestrator.strategy.value}"
+            )
+        if not hasattr(orchestrator_instance, "prepare_streaming"):
+            # Fallback: non-streaming
+            result = await orchestrator_instance.handle_message(
+                user_message, chat_history, conversation_id, force_database=force_database
+            )
+            return {"streaming": False, "messages": result}
+
+        return await orchestrator_instance.prepare_streaming(
+            user_message, chat_history, force_database=force_database
+        )

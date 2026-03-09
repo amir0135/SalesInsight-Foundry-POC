@@ -31,8 +31,8 @@ for arg in "$@"; do
             shift
             ;;
         --fast)
-            # Fast mode: skip both Azure and deps
-            SKIP_AZURE=true
+            # Fast mode: skip deps but still run Azure config (policies reset daily)
+            SKIP_AZURE=false
             SKIP_DEPS=true
             shift
             ;;
@@ -163,14 +163,28 @@ configure_azure_storage() {
 
     if [ "$PUBLIC_ACCESS" = "Disabled" ]; then
         echo -e "${YELLOW}  Public network access is disabled, enabling for local dev...${NC}"
-        if az storage account update -n "$STORAGE_ACCOUNT" -g "$RESOURCE_GROUP" --public-network-access Enabled > /dev/null 2>&1; then
-            echo -e "${GREEN}  ✓ Public network access enabled${NC}"
+        if az storage account update -n "$STORAGE_ACCOUNT" -g "$RESOURCE_GROUP" \
+            --public-network-access Enabled --default-action Allow > /dev/null 2>&1; then
+            echo -e "${GREEN}  ✓ Public network access enabled (default: Allow)${NC}"
         else
             echo -e "${RED}  ✗ Failed to enable public network access${NC}"
             echo -e "${YELLOW}    You may need to enable it manually in Azure Portal${NC}"
         fi
     else
-        echo -e "${GREEN}  ✓ Public network access is enabled${NC}"
+        # Ensure default action is Allow even if public access was already enabled
+        DEFAULT_ACTION=$(az storage account show -n "$STORAGE_ACCOUNT" -g "$RESOURCE_GROUP" \
+            --query "networkRuleSet.defaultAction" -o tsv 2>/dev/null || echo "")
+        if [ "$DEFAULT_ACTION" = "Deny" ]; then
+            echo -e "${YELLOW}  Default action is Deny, switching to Allow for local dev...${NC}"
+            if az storage account update -n "$STORAGE_ACCOUNT" -g "$RESOURCE_GROUP" \
+                --default-action Allow > /dev/null 2>&1; then
+                echo -e "${GREEN}  ✓ Default action set to Allow${NC}"
+            else
+                echo -e "${RED}  ✗ Failed to update default action${NC}"
+            fi
+        else
+            echo -e "${GREEN}  ✓ Public network access is enabled (default: Allow)${NC}"
+        fi
     fi
 
     # Verify RBAC roles for current user (informational only)
@@ -642,7 +656,6 @@ if [ "$SKIP_AZURE" = true ]; then
     echo ""
 else
     configure_azure_storage
-    configure_cosmos_db
 fi
 
 # Check if PostgreSQL container is running (for Database/Redshift testing)
@@ -734,7 +747,7 @@ wait
 
 # Export environment variables for Database/Redshift
 export USE_REDSHIFT=true
-export REDSHIFT_HOST=localhost
+export REDSHIFT_HOST=127.0.0.1
 export REDSHIFT_PORT=$POSTGRES_PORT
 export REDSHIFT_DB=$POSTGRES_DB
 export REDSHIFT_USER=$POSTGRES_USER

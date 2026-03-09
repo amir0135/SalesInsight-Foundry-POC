@@ -186,6 +186,37 @@ class QuestionAnswerTool(AnsweringToolBase):
 
         return clean_answer
 
+    def answer_question_streaming(self, question: str, chat_history: list[dict], **kwargs):
+        """
+        Stream the answer generation. Yields (source_documents, delta_text) tuples.
+        First yield has source_documents set; subsequent yields have delta_text only.
+        """
+        logger.info("Answering question (streaming)")
+        source_documents = Search.get_source_documents(self.search_handler, question)
+
+        image_urls = []
+        model = None
+
+        if self.config.prompts.use_on_your_data_format:
+            messages = self.generate_on_your_data_messages(
+                question, chat_history, source_documents, image_urls
+            )
+        else:
+            messages = self.generate_messages(question, source_documents)
+
+        llm_helper = LLMHelper()
+        stream = llm_helper.get_chat_completion_streaming(messages, model=model, temperature=0)
+
+        # Yield source documents first so caller can build citations
+        yield source_documents, None
+
+        for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            if delta.content:
+                yield None, delta.content
+
     def create_image_url_list(self, source_documents):
         image_types = self.config.get_advanced_image_processing_image_types()
 

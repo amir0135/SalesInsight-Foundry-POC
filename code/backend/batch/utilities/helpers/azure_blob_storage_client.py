@@ -40,6 +40,9 @@ def create_queue_client():
 
 
 class AzureBlobStorageClient:
+    _cached_delegation_key = None
+    _delegation_key_failed = False
+
     def __init__(
         self,
         account_name: Optional[str] = None,
@@ -58,15 +61,21 @@ class AzureBlobStorageClient:
             self.blob_service_client = BlobServiceClient(
                 account_url=self.endpoint, credential=get_azure_credential(env_helper.MANAGED_IDENTITY_CLIENT_ID)
             )
-            try:
-                self.user_delegation_key = self.request_user_delegation_key(
-                    blob_service_client=self.blob_service_client
-                )
-            except Exception as e:
-                # Gracefully handle delegation key failure for local dev
-                import logging
-                logging.warning(f"Could not get user delegation key (may not be needed for local dev): {e}")
+            if AzureBlobStorageClient._cached_delegation_key is not None:
+                self.user_delegation_key = AzureBlobStorageClient._cached_delegation_key
+            elif AzureBlobStorageClient._delegation_key_failed:
                 self.user_delegation_key = None
+            else:
+                try:
+                    self.user_delegation_key = self.request_user_delegation_key(
+                        blob_service_client=self.blob_service_client
+                    )
+                    AzureBlobStorageClient._cached_delegation_key = self.user_delegation_key
+                except Exception as e:
+                    import logging
+                    logging.warning(f"Could not get user delegation key (may not be needed for local dev): {e}")
+                    self.user_delegation_key = None
+                    AzureBlobStorageClient._delegation_key_failed = True
         else:
             self.account_key = account_key or env_helper.AZURE_BLOB_ACCOUNT_KEY
             self.blob_service_client = BlobServiceClient(
@@ -128,7 +137,9 @@ class AzureBlobStorageClient:
             content_settings=content_settings,
             metadata=metadata,
         )
-        # Generate a SAS URL to the blob and return it, if auth_type is rbac, account_key is None, if not, user_delegation_key is None.
+        # Generate a SAS URL to the blob and return it
+        if self.user_delegation_key is None and self.account_key is None:
+            return blob_client.url
         return (
             blob_client.url
             + "?"
@@ -246,6 +257,9 @@ class AzureBlobStorageClient:
         blob_client.set_blob_metadata(metadata=blob_metadata)
 
     def get_container_sas(self):
+        # In RBAC mode without delegation key or account key, return empty SAS
+        if self.user_delegation_key is None and self.account_key is None:
+            return ""
         # Generate a SAS URL to the container and return it
         return "?" + generate_container_sas(
             account_name=self.account_name,
@@ -257,6 +271,9 @@ class AzureBlobStorageClient:
         )
 
     def get_blob_sas(self, file_name):
+        # In RBAC mode without delegation key or account key, return unsigned URL
+        if self.user_delegation_key is None and self.account_key is None:
+            return f"{self.endpoint}{self.container_name}/{file_name}"
         # Generate a SAS URL to the blob and return it
         return (
             f"{self.endpoint}{self.container_name}/{file_name}"

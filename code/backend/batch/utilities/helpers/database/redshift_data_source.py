@@ -250,14 +250,17 @@ class RedshiftDataSource(DatabaseDataSource):
         logger.info("Schema cache refreshed")
 
     def _get_connection(self):
-        """Create a connection to Redshift."""
-        return psycopg2.connect(
-            host=self.host,
-            port=self.port,
-            database=self.database,
-            user=self.user,
-            password=self.password,
+        """Create a connection to Redshift/PostgreSQL."""
+        # Use DSN string to pass gssencmode=disable which prevents
+        # libpq 17+ from hanging on GSS encryption negotiation with
+        # older PostgreSQL servers (e.g. PG 15 in local Docker).
+        dsn = (
+            f"host={self.host} port={self.port} dbname={self.database} "
+            f"user={self.user} password={self.password} "
+            f"connect_timeout=10 gssencmode=disable "
+            f"options='-c statement_timeout=30000'"
         )
+        return psycopg2.connect(dsn)
 
     def _execute_query(
         self, query: sql.Composable, params: Optional[tuple] = None

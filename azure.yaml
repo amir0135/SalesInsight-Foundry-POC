@@ -17,10 +17,10 @@ hooks:
       shell: pwsh
       run: ./scripts/parse_env.ps1
 services:
-  web:
+  web-docker:
     project: ./code
     language: py
-    host: containerapp
+    host: appservice
     docker:
       path: ../docker/Frontend.Dockerfile
       context: ..
@@ -38,10 +38,10 @@ services:
           interactive: true
           continueOnError: false
 
-  adminweb:
+  adminweb-docker:
     project: ./code/backend
     language: py
-    host: containerapp
+    host: appservice
     docker:
       path: ../../docker/Admin.Dockerfile
       context: ../..
@@ -54,10 +54,10 @@ services:
           shell: sh
           run: poetry install; poetry export -o requirements.txt
 
-  function:
+  function-docker:
     project: ./code/backend/batch
     language: py
-    host: containerapp
+    host: appservice
     docker:
       path: ../../../docker/Backend.Dockerfile
       context: ../../..

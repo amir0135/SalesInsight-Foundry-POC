@@ -15,6 +15,7 @@ from ..helpers.llm_helper import LLMHelper
 from ..helpers.env_helper import EnvHelper
 from ..plugins.chat_plugin import get_chat_plugin
 from ..plugins.post_answering_plugin import PostAnsweringPlugin
+from ..search.search import Search
 from .orchestrator_base import OrchestratorBase
 
 logger = logging.getLogger(__name__)
@@ -27,7 +28,8 @@ class SemanticKernelOrchestrator(OrchestratorBase):
         self.llm_helper = LLMHelper()
         self.env_helper = EnvHelper()
 
-        # Add the Azure OpenAI service to the kernel
+        # Tool selection model — uses main model via SK
+        # (gpt-4.1-mini triggers jailbreak filter with SK prompt templates)
         self.chat_service = self.llm_helper.get_sk_chat_completion_service("cwyd")
         self.kernel.add_service(self.chat_service)
 
@@ -93,7 +95,7 @@ You must prioritize the function call over your general knowledge for any questi
 Call the text_processing function when the user request an operation on the current context, such as translate, summarize, or paraphrase. When a language is explicitly specified, return that as part of the operation.
 When directly replying to the user, always reply in the language the user is speaking.
 If the input language is ambiguous, default to responding in English unless otherwise specified by the user.
-You **must not** respond if asked to List all documents in your repository.
+Do not list all documents in the repository.
 """
 
         self.kernel.add_plugin(
@@ -216,6 +218,166 @@ You **must not** respond if asked to List all documents in your repository.
         )
         logger.info("Method orchestrate of semantic_kernel ended")
         return messages
+
+    async def prepare_streaming(
+        self, user_message: str, chat_history: list[dict], **kwargs: dict
+    ) -> dict:
+        """
+        Async preparation phase for streaming: tool selection + search.
+
+        Returns a dict:
+        - {"streaming": False, "messages": [...]} — complete response, no streaming needed
+        - {"streaming": True, "question": str, "source_documents": [...],
+           "llm_messages": [...], "model": str|None} — caller should stream LLM call
+        """
+        logger.info("Method prepare_streaming started")
+        force_database = kwargs.get("force_database", False)
+
+        if force_database:
+            result = await self.orchestrate(user_message, chat_history, **kwargs)
+            return {"streaming": False, "messages": result}
+
+        if self.config.prompts.enable_content_safety:
+            if response := self.call_content_safety_input(user_message):
+                return {"streaming": False, "messages": response}
+
+        # --- Tool selection (fast model, non-streaming) ---
+        system_message = self.env_helper.SEMANTIC_KERNEL_SYSTEM_PROMPT
+        if not system_message:
+            use_redshift = os.getenv("USE_REDSHIFT", "false").lower() == "true"
+            if use_redshift:
+                system_message = """You help employees navigate information from documents AND operational databases.
+
+TOOL SELECTION - Choose the RIGHT tool for each question:
+
+1. **query_database** - ALWAYS use for database questions about:
+   - Errors, error counts, error messages, error_logs
+   - Disconnections, connections, connectivity_logs
+   - Facilities, bays, radar devices
+   - Questions with: "how many", "count", "total", "top N", "which has most", "list", "show"
+   - Time-based queries: "last week", "past 30 days", "yesterday"
+
+2. **search_documents** - Use for document/policy questions:
+   - Contract terms, policies, procedures
+   - Documentation content, specifications
+
+3. **text_processing** - Use for transformations:
+   - Translate, summarize, paraphrase text
+
+IMPORTANT: For ANY question about errors, disconnections, facilities, or operational metrics, use query_database.
+When directly replying to the user, always reply in the language the user is speaking.
+"""
+            else:
+                system_message = """You help employees to navigate only private information sources.
+You must prioritize the function call over your general knowledge for any question by calling the search_documents function.
+Call the text_processing function when the user request an operation on the current context, such as translate, summarize, or paraphrase. When a language is explicitly specified, return that as part of the operation.
+When directly replying to the user, always reply in the language the user is speaking.
+If the input language is ambiguous, default to responding in English unless otherwise specified by the user.
+Do not list all documents in the repository.
+"""
+
+        self.kernel.add_plugin(
+            plugin=get_chat_plugin(question=user_message, chat_history=chat_history),
+            plugin_name="Chat",
+        )
+
+        settings = self.llm_helper.get_sk_service_settings(self.chat_service)
+        settings.function_choice_behavior = FunctionChoiceBehavior.Auto(
+            auto_invoke=False, filters={"included_plugins": ["Chat"]}
+        )
+
+        orchestrate_function = self.kernel.add_function(
+            plugin_name="Main",
+            function_name="orchestrate",
+            prompt="{{$chat_history}}{{$user_message}}",
+            prompt_execution_settings=settings,
+        )
+
+        history = ChatHistory(system_message=system_message)
+        for message in chat_history.copy():
+            history.add_message(message)
+
+        chat_history_str = ""
+        for message in history.messages:
+            chat_history_str += f"{message.role}: {message.content}\n"
+
+        result: ChatMessageContent = (
+            await self.kernel.invoke(
+                function=orchestrate_function,
+                chat_history=chat_history_str,
+                user_message=user_message,
+            )
+        ).value[0]
+
+        self.log_tokens(
+            prompt_tokens=result.metadata["usage"].prompt_tokens,
+            completion_tokens=result.metadata["usage"].completion_tokens,
+        )
+
+        if result.finish_reason != FinishReason.TOOL_CALLS:
+            answer = Answer(
+                question=user_message,
+                answer=result.content,
+                prompt_tokens=result.metadata["usage"].prompt_tokens,
+                completion_tokens=result.metadata["usage"].completion_tokens,
+            )
+            messages = self.output_parser.parse(
+                question=answer.question,
+                answer=answer.answer,
+                source_documents=answer.source_documents,
+            )
+            return {"streaming": False, "messages": messages}
+
+        function_name = result.items[0].name
+        logger.info("prepare_streaming: %s function detected", function_name)
+        arguments = json.loads(result.items[0].arguments)
+
+        # Only stream for search_documents; other tools execute fully
+        if "search_documents" not in function_name:
+            function = self.kernel.get_function_from_fully_qualified_function_name(
+                function_name
+            )
+            answer: Answer = (
+                await self.kernel.invoke(function=function, **arguments)
+            ).value
+            self.log_tokens(
+                prompt_tokens=answer.prompt_tokens,
+                completion_tokens=answer.completion_tokens,
+            )
+            messages = self.output_parser.parse(
+                question=answer.question,
+                answer=answer.answer,
+                source_documents=answer.source_documents,
+            )
+            return {"streaming": False, "messages": messages}
+
+        # --- Streaming search_documents path ---
+        # Do the search now (sync, fast), prepare LLM messages, return for caller to stream
+        from ..tools.question_answer_tool import QuestionAnswerTool
+
+        qa_tool = QuestionAnswerTool()
+        question = arguments.get("question", user_message)
+
+        source_documents = Search.get_source_documents(qa_tool.search_handler, question)
+
+        image_urls = []
+        model = None
+
+        if qa_tool.config.prompts.use_on_your_data_format:
+            llm_messages = qa_tool.generate_on_your_data_messages(
+                question, chat_history, source_documents, image_urls
+            )
+        else:
+            llm_messages = qa_tool.generate_messages(question, source_documents)
+
+        logger.info("prepare_streaming: search done, %d docs, ready to stream LLM", len(source_documents))
+        return {
+            "streaming": True,
+            "question": question,
+            "source_documents": source_documents,
+            "llm_messages": llm_messages,
+            "model": model,
+        }
 
     async def _handle_force_database_query(
         self, user_message: str, chat_history: list[dict]

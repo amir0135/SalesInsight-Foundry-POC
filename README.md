@@ -1,6 +1,6 @@
 ---
-name: Chat with your data - Solution accelerator (Python)
-description: Chat with your data using OpenAI and AI Search with Python.
+name: SalesInsight Foundry POC
+description: AI-powered sales analytics with RAG document search and natural language SQL queries, built on Azure AI Foundry.
 languages:
 - python
 - typescript
@@ -11,322 +11,417 @@ products:
 - azure-cognitive-search
 - azure-app-service
 - azure
-- azure-bot-service
+- azure-ai-foundry
 - document-intelligence
 - azure-functions
 - azure-storage-accounts
-- azure-speech
 page_type: sample
-urlFragment: chat-with-your-data-solution-accelerator
-
----
-<!-- YAML front-matter schema: https://review.learn.microsoft.com/en-us/help/contribute/samples/process/onboarding?branch=main#supported-metadata-fields-for-readmemd -->
-
-# Chat with your data - Solution accelerator
-
-> **🚀 Fork with Database Integration**: This fork includes additional Database/Redshift integration for querying operational data via natural language. See [Database Integration](#database-integration) and [Local Setup Guide](docs/SETUP.md).
-
- ##### Table of Contents
-- [Chat with your data - Solution accelerator](#chat-with-your-data---solution-accelerator)
-        - [Table of Contents](#table-of-contents)
-  - [User story](#user-story)
-    - [About this repo](#about-this-repo)
-    - [When should you use this repo?](#when-should-you-use-this-repo)
-    - [Key features](#key-features)
-    - [Target end users](#target-end-users)
-    - [Industry scenario](#industry-scenario)
-  - [Deploy](#deploy)
-    - [Pre-requisites](#pre-requisites)
-    - [Products used](#products-used)
-    - [Required licenses](#required-licenses)
-    - [Pricing Considerations](#pricing-considerations)
-    - [Deploy instructions](#deploy-instructions)
-    - [Testing the deployment](#testing-the-deployment)
-  - [Supporting documentation](#supporting-documentation)
-    - [Resource links](#resource-links)
-    - [Licensing](#licensing)
-  - [Disclaimers](#disclaimers)
-## User story
-Welcome to the *Chat with your data* Solution accelerator repository! The *Chat with your data* Solution accelerator is a powerful tool that combines the capabilities of Azure AI Search and Large Language Models (LLMs) to create a conversational search experience. This solution accelerator uses an Azure OpenAI GPT model and an Azure AI Search index generated from your data, which is integrated into a web application to provide a natural language interface, including [speech-to-text](docs/speech_to_text.md) functionality, for search queries. Users can drag and drop files, point to storage, and take care of technical setup to transform documents. Everything can be deployed in your own subscription to accelerate your use of this technology.
-
-
-
-
-### About this repo
-
-This repository provides an end-to-end solution for users who want to query their data with natural language. It includes a well designed ingestion mechanism for multiple file types, an easy deployment, and a support team for maintenance. The accelerator demonstrates both Push or Pull Ingestion; the choice of orchestration (Semantic Kernel, LangChain, OpenAI Functions or [Prompt Flow](docs/prompt_flow.md)) and should be the minimum components needed to implement a RAG pattern. It is not intended to be put into Production as-is without experimentation or evaluation of your data. It provides the following features:
-
-* Chat with an Azure OpenAI model using your own data
-* Upload and process your documents
-* Index public web pages
-* Easy prompt configuration
-* Multiple chunking strategies
-
-### When should you use this repo?
-
-If you need to customize your scenario beyond what [Azure OpenAI on your data](https://learn.microsoft.com/azure/ai-services/openai/concepts/use-your-data) offers out-of-the-box, use this repository.
-By default, this repo comes with one specific set of RAG configurations including but not limited to: chunk size, overlap, retrieval/search type and system prompt. It is important that you evaluate the retrieval/search and the generation of the answers for your data and tune these configurations accordingly before you use this repo in production. For a starting point to understand and perform RAG evaluations, we encourage you to look into the [RAG Experiment Accelerator](https://github.com/microsoft/rag-experiment-accelerator).
-
-The accelerator presented here provides several options, for example:
-* The ability to ground a model using both data and public web pages
-* A backend with support for 'custom' and 'On Your Data' [conversation flows](./docs/conversation_flow_options.md)
-* Advanced prompt engineering capabilities
-* An admin site for ingesting/inspecting/configuring your dataset on the fly
-* Push or Pull model for data ingestion:  See [integrated vectorization](./docs/integrated_vectorization.md) documentation for more details
-* Running a Retrieval Augmented Generation (RAG) solution locally
-
-*Have you seen [ChatGPT + Enterprise data with Azure OpenAI and AI Search demo](https://github.com/Azure-Samples/azure-search-openai-demo)? If you would like to experiment: Play with prompts, understanding RAG pattern different implementation approaches, see how different features interact with the RAG pattern and choose the best options for your RAG deployments, take a look at that repo.
-
-Here is a comparison table with a few features offered by Azure, an available GitHub demo sample and this repo, that can provide guidance when you need to decide which one to use:
-
-| Name	| Feature or Sample? |	What is it? | When to use? |
-| ---------|---------|---------|---------|
-|["Chat with your data" Solution Accelerator](https://aka.ms/ChatWithYourDataSolutionAccelerator) - (This repo)	| Azure sample | End-to-end baseline RAG pattern sample that uses Azure AI Search as a retriever.	| This sample should be used by Developers when the  RAG pattern implementations provided by Azure are not able to satisfy business requirements. This sample provides a means to customize the solution. Developers must add their own code to meet requirements, and adapt with best practices according to individual company policies. |
-|[Azure OpenAI on your data](https://learn.microsoft.com/azure/ai-services/openai/concepts/use-your-data) | Azure feature | Azure OpenAI Service offers out-of-the-box, end-to-end RAG implementation that uses a REST API or the web-based interface in the Azure AI Foundry to create a solution that connects to your data to enable an enhanced chat experience with Azure OpenAI ChatGPT models and Azure AI Search. | This should be the first option considered for developers that need an end-to-end solution for Azure OpenAI Service with an Azure AI Search retriever. Simply select supported data sources, that ChatGPT model in Azure OpenAI Service , and any other Azure resources needed to configure your enterprise application needs. |
-|[Azure Machine Learning prompt flow](https://learn.microsoft.com/azure/machine-learning/concept-retrieval-augmented-generation)	| Azure feature | RAG in Azure Machine Learning is enabled by integration with Azure OpenAI Service for large language models and vectorization. It includes support for Faiss and Azure AI Search as vector stores, as well as support for open-source offerings, tools, and frameworks such as LangChain for data chunking. Azure Machine Learning prompt flow offers the ability to test data generation, automate prompt creation, visualize prompt evaluation metrics, and integrate RAG workflows into MLOps using pipelines.  | When Developers need more control over processes involved in the development cycle of LLM-based AI applications, they should use Azure Machine Learning prompt flow to create executable flows and evaluate performance through large-scale testing. |
-|[ChatGPT + Enterprise data with Azure OpenAI and AI Search demo](https://github.com/Azure-Samples/azure-search-openai-demo) | Azure sample | RAG pattern demo that uses Azure AI Search as a retriever. | Developers who would like to use or present an end-to-end demonstration of the RAG pattern should use this sample. This includes the ability to deploy and test different retrieval modes, and prompts to support business use cases. |
-|[RAG Experiment Accelerator](https://github.com/microsoft/rag-experiment-accelerator) | Tool |The RAG Experiment Accelerator is a versatile tool that helps you conduct experiments and evaluations using Azure AI Search and RAG pattern. | RAG Experiment Accelerator is to make it easier and faster to run experiments and evaluations of search queries and quality of response from OpenAI. This tool is useful for researchers, data scientists, and developers who want to, Test the performance of different Search and OpenAI related hyperparameters. |
-
-
-### Key features
-- **Private LLM access on your data**: Get all the benefits of ChatGPT on your private, unstructured data.
-- **Single application access to your full data set**: Minimize endpoints required to access internal company knowledgebases. Reuse the same backend with the [Microsoft Teams Extension](docs/teams_extension.md)
-- **Natural language interaction with your unstructured data**: Use natural language to quickly find the answers you need and ask follow-up queries to get the supplemental details, including [Speech-to-text](docs/speech_to_text.md).
-- **Easy access to source documentation when querying**: Review referenced documents in the same chat window for additional context.
-- **Chat history**: Prior conversations and context are maintained and accessible through chat history.
-- **Data upload**: Batch upload documents of [various file types](docs/supported_file_types.md)
-- **Accessible orchestration**: Prompt and document configuration (prompt engineering, document processing, and data retrieval)
-- **Database flexibility**: Dynamic database switching allows users to choose between PostgreSQL and Cosmos DB based on their requirements. If no preference is specified the platform defaults to PostgreSQL.
-
-
-**Note**: The current model allows users to ask questions about unstructured data, such as PDF, text, and docx files. See the [supported file types](docs/supported_file_types.md).
-
-
-### Target end users
-Company personnel (employees, executives) looking to research against internal unstructured company data would leverage this accelerator using natural language to find what they need quickly.
-
-This accelerator also works across industry and roles and would be suitable for any employee who would like to get quick answers with a ChatGPT experience against their internal unstructured company data.
-
-Tech administrators can use this accelerator to give their colleagues easy access to internal unstructured company data. Admins can customize the system configurator to tailor responses for the intended audience.
-
-
-### Use Case scenarios
-
-#### Employee Onboarding Scenario
-The sample data illustrates how this accelerator could be used for an employee onboarding scenario in across industries.
-
-In this scenario, a newly hired employee is in the process of onboarding to their organization. Leveraging the solution accelerator, she navigates through the extensive offerings of her organization’s health and retirement benefits. With the newly integrated chat history capabilities, they can revisit previous conversations, ensuring continuity and context across multiple days of research. This functionality allows the new employee to efficiently gather and consolidate information, streamlining their onboarding experience. [For more details, refer to the README](docs/employee_assistance.md).
-
-#### Financial Advisor Scenario
-The sample data illustrates how this accelerator could be used in the financial services industry (FSI).
-
-In this scenario, a financial advisor is preparing for a meeting with a potential client who has expressed interest in Woodgrove Investments’ Emerging Markets Funds. The advisor prepares for the meeting by refreshing their understanding of the emerging markets fund's overall goals and the associated risks.
-
-Now that the financial advisor is more informed about Woodgrove’s Emerging Markets Funds, they're better equipped to respond to questions about this fund from their client.
-
-#### Contract Review and Summarization Assistant scenario
-Additionally, we have implemented a Legal Review and Summarization Assistant scenario to demonstrate how this accelerator can be utilized in any industry. The Legal Review and Summarization Assistant helps professionals manage and interact with a large collection of documents efficiently. For more details, refer to the [Contract Review and Summarization Assistant README](docs/contract_assistance.md).
-
-Note: Some of the sample data included with this accelerator was generated using AI and is for illustrative purposes only.
-
+urlFragment: salesinsight-foundry-poc
 
 ---
 
-![One-click Deploy](/docs/images/oneClickDeploy.png)
-## Deploy
-### Pre-requisites
-- Azure subscription - [Create one for free](https://azure.microsoft.com/free/) with owner access.
-- Approval to use Azure OpenAI services with your Azure subcription. To apply for approval, see [here](https://learn.microsoft.com/en-us/azure/ai-services/openai/overview#how-do-i-get-access-to-azure-openai).
-- [Enable custom Teams apps and turn on custom app uploading](https://learn.microsoft.com/en-us/microsoftteams/platform/concepts/build-and-test/prepare-your-o365-tenant#enable-custom-teams-apps-and-turn-on-custom-app-uploading) (optional: Teams extension only)
+# SalesInsight Foundry POC
 
-### Products used
-- Azure App Service
-- Azure Application Insights
-- Azure Bot
-- Azure OpenAI
-- Azure Document Intelligence
-- Azure Function App
-- Azure Search Service
-- Azure Storage Account
-- Azure Speech Service
-- Azure CosmosDB
-- Azure PostgreSQL
-- Teams (optional: Teams extension only)
+An AI-powered sales analytics platform that combines **document-based RAG** (Retrieval-Augmented Generation) with **natural language SQL queries** against sales databases. Built on Azure OpenAI and Azure AI Foundry, with support for Snowflake, PostgreSQL, and Redshift data sources.
 
-### Required licenses
-- Microsoft 365 (optional: Teams extension only)
+> Based on the [Chat with your data Solution Accelerator](https://github.com/Azure-Samples/chat-with-your-data-solution-accelerator), extended with NL2SQL capabilities, sales-focused analytics, and Azure AI Foundry Agent orchestration.
 
-### Pricing Considerations
+## Table of Contents
 
-This solution accelerator deploys multiple resources. Evaluate the cost of each component prior to deployment.
+- [Key Features](#key-features)
+- [Architecture](#architecture)
+- [Use Cases](#use-cases)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Local Development](#local-development)
+  - [Docker Quick Start](#docker-quick-start)
+- [Configuration](#configuration)
+  - [Orchestration Strategies](#orchestration-strategies)
+  - [Database Sources](#database-sources)
+  - [Environment Variables](#environment-variables)
+- [Deployment](#deployment)
+- [Testing](#testing)
+- [Project Structure](#project-structure)
+- [Supporting Documentation](#supporting-documentation)
+- [License](#license)
 
-The following are links to the pricing details for some of the resources:
-- [Azure OpenAI service pricing](https://azure.microsoft.com/pricing/details/cognitive-services/openai-service/). GPT and embedding models are charged separately.
-- [Azure AI Search pricing](https://azure.microsoft.com/pricing/details/search/). AI Search core service and semantic ranker are charged separately.
-- [Azure Blob Storage pricing](https://azure.microsoft.com/pricing/details/storage/blobs/)
-- [Azure Functions pricing](https://azure.microsoft.com/pricing/details/functions/)
-- [Azure AI Document Intelligence pricing](https://azure.microsoft.com/pricing/details/ai-document-intelligence/)
-- [Azure Web App Pricing](https://azure.microsoft.com/pricing/details/app-service/windows/)
+---
 
-### Deployment options: PostgreSQL or Cosmos DB
-With the addition of PostgreSQL, customers can leverage the power of a relationship-based AI solution to enhance historical conversation access, improve data privacy, and open the possibilities for scalability.
+## Key Features
 
-Customers have the option to deploy this solution with PostgreSQL or Cosmos DB. Consider the following when deciding which database to use:
-- PostgreSQL enables a relationship-based AI solution and search indexing for Retrieval Augmented Generation (RAG)
-- Cosmos DB enables chat history and is a NoSQL-based solution. With Cosmos DB, Azure AI Search is used for storing extracted documents and embeddings.
+- **Natural Language to SQL**: Ask sales questions in plain English and get SQL results with auto-generated visualizations
+- **Document-Based RAG**: Chat with uploaded PDFs, Word docs, and web content using Azure AI Search and Azure OpenAI
+- **Sales Analytics**: Purpose-built for querying sales order history — best-selling styles, turnover by market/brand, collection performance, and fiscal year reporting
+- **Azure AI Foundry Agent**: New orchestration strategy using Foundry Agent Service with thread-based tool calling
+- **Multiple Orchestrators**: Choose from Semantic Kernel, LangChain, OpenAI Functions, Prompt Flow, or Foundry Agent
+- **Multi-Database Support**: Query Snowflake (production), PostgreSQL (local/analytics), or Redshift, with a local CSV fallback for development
+- **Automatic Visualizations**: Bar charts generated from SQL query results
+- **Admin UI**: Streamlit-based interface for document ingestion, data exploration, prompt configuration, and database connection management
+- **SQL Validation**: Security guardrails enforce SELECT-only queries with table/column allowlists and dangerous pattern detection
+- **Evaluation Pipeline**: Automated evaluation of query quality using Azure AI Foundry scoring
+- **Chat History**: Persistent conversation tracking with PostgreSQL or Cosmos DB
 
+---
 
-To review PostgreSQL configuration overview and steps, follow the link [here](docs/postgreSQL.md).
-![Solution Architecture - Chat with your data PostgreSQL](/docs/images/architecture_pg.png)
+## Architecture
 
-To review Cosmos DB configuration overview and steps, follow the link [here](docs/employee_assistance.md).
-![Solution Architecture - Chat with your data CosmosDB](/docs/images/architecture_cdb.png)
+The platform consists of three deployable services:
 
-### Deploy instructions
-<br/>
+| Service | Path | Technology | Purpose |
+|---------|------|------------|---------|
+| **web** | `code/` | Flask + React | Chat API and frontend UI |
+| **adminweb** | `code/backend/` | Streamlit | Document ingestion, configuration, and database connection management |
+| **function** | `code/backend/batch/` | Azure Functions | Background document processing (chunking, embedding, indexing) |
 
-> ⚠️ **Important: Check Azure OpenAI Quota Availability**
- <br/>To ensure sufficient quota is available in your subscription, please follow [quota check instructions guide](./docs/QuotaCheck.md) before you deploy the solution.
+```
+┌──────────────────────────────────────────────────────────┐
+│                        Users                             │
+└──────┬────────────────────────────┬──────────────────────┘
+       │                            │
+       ▼                            ▼
+  ┌──────────┐               ┌─────────────┐
+  │ Chat UI  │               │  Admin UI   │
+  │ (React)  │               │ (Streamlit) │
+  └────┬─────┘               └─────┬───────┘
+       │                           │
+       └───────────┬───────────────┘
+                   ▼
+          ┌────────────────┐
+          │   Flask API    │
+          │  (Port 5050)   │
+          └───────┬────────┘
+                  │
+        ┌─────────┴──────────┐
+        ▼                    ▼
+  ┌───────────┐     ┌──────────────────┐
+  │ Document  │     │  NL2SQL Engine   │
+  │  Search   │     │ (SQL Generation, │
+  │ (RAG via  │     │  Validation,     │
+  │ AI Search)│     │  Visualization)  │
+  └─────┬─────┘     └────────┬─────────┘
+        │                    │
+        └────────┬───────────┘
+                 ▼
+       ┌──────────────────┐
+       │   Orchestrator   │
+       │ Foundry Agent /  │
+       │ Semantic Kernel /│
+       │ LangChain / etc. │
+       └────────┬─────────┘
+                ▼
+       ┌──────────────────┐
+       │  Azure OpenAI    │
+       └──────────────────┘
 
-<br/>
+Data Sources:
+├── Azure AI Search ─── Document vectors + RAG retrieval
+├── Snowflake ───────── Production sales data (OrderHistoryLine)
+├── PostgreSQL ──────── Local dev + chat history
+├── Redshift ────────── Legacy sales data (optional)
+├── Azure Blob Storage ─ Document staging + config
+└── Cosmos DB ───────── Chat history (alternative to PostgreSQL)
+```
 
-The "Deploy to Azure" button offers a one-click deployment where you don't have to clone the code. If you would like a developer experience instead, follow the [local deployment instructions](./docs/LOCAL_DEPLOYMENT.md) or the [quick setup guide](./docs/SETUP.md).
+### Data Flow
 
-Once you deploy to Azure, you will have the option to select PostgreSQL or Cosmos DB, see screenshot below.
+1. **Documents**: Uploaded via Admin UI → stored in Azure Blob Storage → Azure Functions chunk and embed → indexed in Azure AI Search
+2. **Sales Queries**: User asks a natural language question → NL2SQL engine generates validated SQL → executes against Snowflake/PostgreSQL/Redshift → results returned with optional chart
+3. **Chat**: Queries hit Flask API → orchestrator retrieves context (documents and/or SQL results) → LLM generates response
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Famir0135%2Fchat-with-your-data%2Frefs%2Fheads%2Fmain%2Finfra%2Fmain.json)
+---
 
-Select either "PostgreSQL" or "Cosmos DB":
-![Solution Architecture - DB Selection](/docs/images/db_selection.png)
+## Use Cases
 
+### Sales Analytics
 
-When Deployment is complete, follow steps in [Set Up Authentication in Azure App Service](./docs/azure_app_service_auth_setup.md) to add app authentication to your web app running on Azure App Service
+Ask natural language questions about sales data:
 
-**Note**: The default configuration deploys an OpenAI Model "gpt-4.1" with version 2025-04-14. However, not all
-locations support this version. If you're deploying to a location that doesn't support version 2024-05-13, you'll need to
-switch to a lower version. To find out which versions are supported in different regions, visit the
-[GPT-4.1 Model Availability](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models?tabs=global-standard%2Cstandard-chat-completions#global-standard-model-availability) page.
+```
+"What are the best-selling products this quarter?"
+"What is turnover in France for Brand X in FY 25/26?"
+"Show me the top 10 styles by revenue"
+"What was turnover on collection COL1 2025 in France?"
+"Which customers have the highest order volume?"
+```
 
+Results include data tables and auto-generated bar charts where applicable.
+
+### Document Q&A
+
+Upload internal documents (contracts, product manuals, policies) and ask questions:
+
+```
+"Summarize the key terms of the supplier contract"
+"What does the employee handbook say about remote work?"
+"What are the product specifications for Model X?"
+```
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.10+
+- Node.js 18+
+- [Poetry](https://python-poetry.org/) for dependency management
+- [Azure Developer CLI (`azd`)](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) for deployment
+- Docker (for local PostgreSQL)
+- Azure subscription with Azure OpenAI access
+
+### Local Development
+
+The recommended setup:
+
+```bash
+# Clone and enter the repo
+git clone https://github.com/amir0135/SalesInsight-Foundry-POC.git
+cd SalesInsight-Foundry-POC
+
+# Install dependencies
+poetry install
+cd code/frontend && npm install && cd ../..
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your Azure OpenAI, AI Search, and Blob Storage credentials
+
+# Start all services (Flask, Vite, PostgreSQL container)
+./start_local.sh
+```
+
+Services will be available at:
+
+| Service | URL |
+|---------|-----|
+| Chat UI | http://localhost:5173 |
+| Chat API | http://localhost:5050 |
+| Admin UI | http://localhost:8501 |
+| Azure Functions | http://localhost:7071 |
+
+Use `./stop_local.sh` to shut everything down.
+
+If you've already provisioned Azure resources with `azd`, you can pull the configuration automatically:
+
+```bash
+./scripts/setup_local.sh    # Pulls config from Azure
+./start_local.sh             # Starts all services
+```
+
+### Docker Quick Start
+
+```bash
+cp .env.example .env
+# Edit .env with your credentials
+docker-compose -f docker/docker-compose.local.yml up --build
+```
+
+Chat UI at http://localhost:8080, Admin UI at http://localhost:8501.
+
+---
+
+## Configuration
+
+### Orchestration Strategies
+
+Set via the `ORCHESTRATION_STRATEGY` environment variable:
+
+| Strategy | Description |
+|----------|-------------|
+| `semantic_kernel` | Microsoft Semantic Kernel agent |
+| `openai_function` | Native OpenAI function calling |
+| `langchain` | LangChain agent framework |
+| `prompt_flow` | Azure ML Prompt Flow |
+| `foundry_agent` | Azure AI Foundry Agent Service (thread-based tool calling) |
+
+### Database Sources
+
+The NL2SQL engine supports multiple data sources for sales queries. Configure via the Admin UI (**Database Connection** page) or `.env`:
+
+| Source | Use Case | Key Environment Variables |
+|--------|----------|--------------------------|
+| **Snowflake** | Production sales data | `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_PASSWORD`, `SNOWFLAKE_DATABASE` |
+| **PostgreSQL** | Local development / analytics | `REDSHIFT_HOST=localhost`, `REDSHIFT_PORT=5432` |
+| **Redshift** | Legacy production data | `REDSHIFT_HOST`, `REDSHIFT_PORT=5439` |
+| **Local CSV** | Offline development fallback | Loads from `data/` directory |
+
+For Snowflake setup details, see [docs/snowflake_setup.md](docs/snowflake_setup.md).
+For PostgreSQL configuration, see [docs/postgreSQL.md](docs/postgreSQL.md).
+
+### Environment Variables
+
+All configuration loads through the `EnvHelper` singleton. Key variables:
+
+```bash
+# Azure OpenAI
+AZURE_OPENAI_RESOURCE=your-resource
+AZURE_OPENAI_MODEL=gpt-4.1
+
+# Azure AI Search
+AZURE_SEARCH_SERVICE=your-search-service
+AZURE_SEARCH_INDEX=your-index
+
+# Orchestration
+ORCHESTRATION_STRATEGY=semantic_kernel    # or foundry_agent, langchain, etc.
+CONVERSATION_FLOW=custom                  # or byod
+
+# Database (chat history)
+DATABASE_TYPE=PostgreSQL                  # or CosmosDB
+
+# NL2SQL / Sales Queries
+USE_REDSHIFT=true
+REDSHIFT_HOST=localhost
+REDSHIFT_PORT=5432
+
+# Snowflake (optional)
+SNOWFLAKE_ACCOUNT=your-account
+SNOWFLAKE_USER=your-user
+SNOWFLAKE_PASSWORD=your-password
+SNOWFLAKE_DATABASE=your-database
+```
+
+---
+
+## Deployment
+
+Deployment uses the [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/) with Bicep templates.
+
+> **Before deploying**: Check Azure OpenAI quota availability. See the [quota check guide](./docs/QuotaCheck.md).
+
+```bash
+# Provision Azure resources + deploy all services
+azd up
+
+# Or deploy services individually
+azd deploy web          # Chat UI + API
+azd deploy adminweb     # Admin UI
+azd deploy function     # Background processing
+```
+
+All three services deploy as **Azure Container Apps**. The infrastructure is defined in [infra/main.bicep](infra/main.bicep).
 
 ### Supported Azure Regions
 
-The solution has been tested and is compatible with the following Azure regions:
+The solution has been tested with the following regions:
+
 - **Australia East**
 - **East US 2**
 - **Japan East**
 - **UK South**
 
-These regions are specifically configured in the deployment template to guarantee compatibility with paired regions and data redundancy. This restriction ensures reliable failover scenarios based on Azure's region availability and the requirements of services like Azure Database for PostgreSQL Flexible Server.
+### Post-Deployment
 
-When deploying the solution using the "Deploy to Azure" button, you'll see two fields in the Azure portal:
-- **Region**: This refers to the Azure region where the deployment metadata is stored
-- **Location**: This corresponds to the "location" parameter in the bicep template and determines where all your solution resources will be deployed
-
-**Important**: For this solution, you must select one of the supported regions listed above in the "Location" field. The "Region" field can be set to any available region since it only affects deployment metadata storage.
-
-### Testing the deployment
-1. Navigate to the admin site, where you can upload documents. It will be located at:
-
-    `https://web-{RESOURCE_TOKEN}-admin.azurewebsites.net/`
-
-    Where `{RESOURCE_TOKEN}` is uniquely generated during deployment. This is a combination of your subscription and the name of the resource group. Then select **Ingest Data** and add your data. You can find sample data in the `/data` directory.
-
-    ![A screenshot of the admin site.](./docs/images/admin-site.png)
-
-
-2. Navigate to the web app to start chatting on top of your data. The web app can be found at:
-
-    `https://web-{RESOURCE_TOKEN}.azurewebsites.net/`
-
-
-    ![A screenshot of the chat app.](./docs/images/web-unstructureddata.png)
+1. [Set up authentication in Azure App Service](./docs/azure_app_service_auth_setup.md)
+2. Navigate to the Admin UI to upload documents and configure database connections
+3. Open the Chat UI to start querying
 
 ---
 
-## Database Integration
-
-This fork includes **Database data integration** for querying operational data (errors, connectivity, sessions) via natural language.
-
-### Features
-- 🗣️ **Natural Language to SQL**: Ask questions in plain English, get SQL results
-- 📊 **Smart Schema Retrieval**: Only loads relevant database tables based on your question
-- 🔌 **Dual Database Support**: Works with PostgreSQL (local testing) or AWS Redshift (production)
-- 🤖 **AI-Powered Analysis**: Multi-step analysis of facility health, trends, and comparisons
-
-### Example Queries
-```
-"How many total errors occurred in the last 7 days?"
-"Which facility has the most errors?"
-"Show connectivity status for all facilities"
-"What's the average session duration this month?"
-```
-
-### Local Development with Database
-
-1. **Quick Setup** (after deploying to Azure):
-   ```bash
-   git clone https://github.com/amir0135/chat-with-your-data.git
-   cd chat-with-your-data
-   ./scripts/setup_local.sh   # Pulls config from Azure, installs deps
-   ./start_local.sh            # Starts all services + PostgreSQL
-   ```
-
-2. **Test Database Queries**: Open http://localhost:5173 and ask database questions
-
-See [docs/SETUP.md](docs/SETUP.md) for detailed setup instructions.
-
-### Configuration
-
-Database is enabled by default. Configure in `.env`:
+## Testing
 
 ```bash
-# Enable/disable Database queries
-USE_REDSHIFT=true
+# Python unit tests
+make unittest
 
-# Local PostgreSQL (default for testing)
-REDSHIFT_HOST=localhost
-REDSHIFT_PORT=5432
-REDSHIFT_DB=database_test
+# Frontend tests (Jest)
+make unittest-frontend
 
-# Production Redshift
-# REDSHIFT_HOST=your-cluster.region.redshift.amazonaws.com
-# REDSHIFT_PORT=5439
+# Functional tests (requires running server)
+make functionaltest
+
+# Linting
+make lint
+
+# NL2SQL evaluation (offline, no LLM required)
+make evaluate
+
+# Full evaluation with Azure AI Foundry scoring
+make evaluate-full
+```
+
+Test markers (in `pytest.ini`):
+- `@pytest.mark.unittest` — Fast unit tests
+- `@pytest.mark.functional` — Tests requiring a stubbed server
+- `@pytest.mark.azure` — Extended tests hitting real Azure services
+
+---
+
+## Project Structure
+
+```
+├── code/
+│   ├── app.py                          # Flask entry point
+│   ├── create_app.py                   # Flask route definitions
+│   ├── frontend/                       # React chat UI (Vite + TypeScript)
+│   ├── backend/
+│   │   ├── Admin.py                    # Streamlit admin entry point
+│   │   ├── pages/                      # Admin UI pages
+│   │   │   ├── 01_Ingest_Data.py
+│   │   │   ├── 02_Explore_Data.py
+│   │   │   ├── 03_Delete_Data.py
+│   │   │   ├── 04_Configuration.py
+│   │   │   └── 05_Database_Connection.py
+│   │   └── batch/
+│   │       ├── function_app.py         # Azure Functions entry point
+│   │       └── utilities/
+│   │           ├── orchestrator/       # Orchestration strategies
+│   │           │   ├── strategies.py
+│   │           │   ├── semantic_kernel.py
+│   │           │   ├── foundry_agent.py
+│   │           │   ├── lang_chain.py
+│   │           │   └── ...
+│   │           ├── nl2sql/             # Natural language to SQL engine
+│   │           │   ├── sql_generator.py
+│   │           │   ├── query_validator.py
+│   │           │   └── prompt_builder.py
+│   │           ├── visualization/      # Chart generation
+│   │           ├── helpers/            # EnvHelper, config, database connectors
+│   │           ├── document_loading/   # File type handlers
+│   │           └── document_chunking/  # Chunking strategies
+│   └── tests/                          # Unit and functional tests
+├── data/                               # Sample data (CSV, contracts, search schema)
+├── docker/                             # Dockerfiles and docker-compose configs
+├── docs/                               # Setup guides, architecture docs, ADRs
+├── infra/                              # Bicep templates for Azure deployment
+├── scripts/                            # Setup, packaging, and evaluation scripts
+│   ├── evaluation/                     # Golden dataset and evaluation runner
+│   └── data_scripts/                   # Data preparation utilities
+├── start_local.sh                      # Start all local services
+├── stop_local.sh                       # Stop all local services
+├── azure.yaml                          # Azure Developer CLI service definitions
+├── pyproject.toml                      # Python dependencies (Poetry)
+└── Makefile                            # Build, test, and lint commands
 ```
 
 ---
 
-![Supporting documentation](/docs/images/supportingDocuments.png)
+## Supporting Documentation
 
-## Supporting documentation
+- [Local Setup Guide](docs/SETUP.md)
+- [Database Integration](docs/database_integration.md)
+- [Database AI Query Implementation](docs/database_ai_query_implementation.md)
+- [Snowflake Setup](docs/snowflake_setup.md)
+- [PostgreSQL Configuration](docs/postgreSQL.md)
+- [Conversation Flow Options](docs/conversation_flow_options.md)
+- [Integrated Vectorization](docs/integrated_vectorization.md)
+- [Supported File Types](docs/supported_file_types.md)
+- [Speech to Text](docs/speech_to_text.md)
+- [Prompt Flow](docs/prompt_flow.md)
+- [Model Configuration](docs/model_configuration.md)
 
-### Resource links
+### Azure Service Documentation
 
-This solution accelerator deploys the following resources. It's critical to comprehend the functionality of each. Below are the links to their respective documentation:
-- [Application Insights overview - Azure Monitor | Microsoft Learn](https://learn.microsoft.com/en-us/azure/azure-monitor/app/app-insights-overview?tabs=net)
-- [Azure OpenAI Service - Documentation, quickstarts, API reference - Azure AI services | Microsoft Learn](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/use-your-data)
-- [Using your data with Azure OpenAI Service - Azure OpenAI | Microsoft Learn](https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/use-your-data)
-- [Content Safety documentation - Quickstarts, Tutorials, API Reference - Azure AI services | Microsoft Learn](https://learn.microsoft.com/en-us/azure/ai-services/content-safety/)
-- [Document Intelligence documentation - Quickstarts, Tutorials, API Reference - Azure AI services | Microsoft Learn](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/?view=doc-intel-3.1.0)
-- [Azure Functions documentation | Microsoft Learn](https://learn.microsoft.com/en-us/azure/azure-functions/)
-- [Azure Cognitive Search documentation | Microsoft Learn](https://learn.microsoft.com/en-us/azure/search/)
-- [Speech to text documentation - Tutorials, API Reference - Azure AI services - Azure AI services | Microsoft Learn](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/index-speech-to-text)
-- [Bots in Microsoft Teams - Teams | Microsoft Learn](https://learn.microsoft.com/en-us/microsoftteams/platform/bots/what-are-bots) (Optional: Teams extension only)
+- [Azure OpenAI Service](https://learn.microsoft.com/en-us/azure/ai-services/openai/)
+- [Azure AI Search](https://learn.microsoft.com/en-us/azure/search/)
+- [Azure AI Foundry](https://learn.microsoft.com/en-us/azure/ai-studio/)
+- [Azure Functions](https://learn.microsoft.com/en-us/azure/azure-functions/)
+- [Azure Document Intelligence](https://learn.microsoft.com/en-us/azure/ai-services/document-intelligence/)
+- [Azure Application Insights](https://learn.microsoft.com/en-us/azure/azure-monitor/app/app-insights-overview)
 
-### Licensing
+---
+
+## License
 
 This repository is licensed under the [MIT License](LICENSE.md).
 
-The data set under the /data folder is licensed under the [CDLA-Permissive-2 License](CDLA-Permissive-2.md).
-
-## Disclaimers
-This Software requires the use of third-party components which are governed by separate proprietary or open-source licenses as identified below, and you must comply with the terms of each applicable license in order to use the Software. You acknowledge and agree that this license does not grant you a license or other right to use any such third-party proprietary or open-source components.
-
-To the extent that the Software includes components or code used in or derived from Microsoft products or services, including without limitation Microsoft Azure Services (collectively, “Microsoft Products and Services”), you must also comply with the Product Terms applicable to such Microsoft Products and Services. You acknowledge and agree that the license governing the Software does not grant you a license or other right to use Microsoft Products and Services. Nothing in the license or this ReadMe file will serve to supersede, amend, terminate or modify any terms in the Product Terms for any Microsoft Products and Services.
-
-You must also comply with all domestic and international export laws and regulations that apply to the Software, which include restrictions on destinations, end users, and end use. For further information on export restrictions, visit https://aka.ms/exporting.
-
-You acknowledge that the Software and Microsoft Products and Services (1) are not designed, intended or made available as a medical device(s), and (2) are not designed or intended to be a substitute for professional medical advice, diagnosis, treatment, or judgment and should not be used to replace or as a substitute for professional medical advice, diagnosis, treatment, or judgment. Customer is solely responsible for displaying and/or obtaining appropriate consents, warnings, disclaimers, and acknowledgements to end users of Customer’s implementation of the Online Services.
-
-You acknowledge the Software is not subject to SOC 1 and SOC 2 compliance audits. No Microsoft technology, nor any of its component technologies, including the Software, is intended or made available as a substitute for the professional advice, opinion, or judgement of a certified financial services professional. Do not use the Software to replace, substitute, or provide professional financial advice or judgment.
-
-BY ACCESSING OR USING THE SOFTWARE, YOU ACKNOWLEDGE THAT THE SOFTWARE IS NOT DESIGNED OR INTENDED TO SUPPORT ANY USE IN WHICH A SERVICE INTERRUPTION, DEFECT, ERROR, OR OTHER FAILURE OF THE SOFTWARE COULD RESULT IN THE DEATH OR SERIOUS BODILY INJURY OF ANY PERSON OR IN PHYSICAL OR ENVIRONMENTAL DAMAGE (COLLECTIVELY, “HIGH-RISK USE”), AND THAT YOU WILL ENSURE THAT, IN THE EVENT OF ANY INTERRUPTION, DEFECT, ERROR, OR OTHER FAILURE OF THE SOFTWARE, THE SAFETY OF PEOPLE, PROPERTY, AND THE ENVIRONMENT ARE NOT REDUCED BELOW A LEVEL THAT IS REASONABLY, APPROPRIATE, AND LEGAL, WHETHER IN GENERAL OR IN A SPECIFIC INDUSTRY. BY ACCESSING THE SOFTWARE, YOU FURTHER ACKNOWLEDGE THAT YOUR HIGH-RISK USE OF THE SOFTWARE IS AT YOUR OWN RISK.
+Some sample data included in this repository was generated using AI and is for illustrative purposes only.

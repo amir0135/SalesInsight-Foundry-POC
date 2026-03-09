@@ -42,7 +42,12 @@ def get_azure_credential(client_id=None):
     """
     if os.getenv("APP_ENV", "prod").lower() == "dev":
         return (
-            DefaultAzureCredential()
+            DefaultAzureCredential(
+                exclude_managed_identity_credential=True,
+                exclude_powershell_credential=True,
+                exclude_shared_token_cache_credential=True,
+                exclude_workload_identity_credential=True,
+            )
         )  # CodeQL [SM05139] Okay use of DefaultAzureCredential as it is only used in development
     else:
         return ManagedIdentityCredential(client_id=client_id)

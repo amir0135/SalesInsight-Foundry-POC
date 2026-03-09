@@ -549,7 +549,8 @@ def create_app():
                 )
             )
 
-            messages = await message_orchestrator.handle_message(
+            # Phase 1 (async): tool selection + search — returns immediately
+            prep = await message_orchestrator.prepare_streaming(
                 user_message=user_message,
                 chat_history=user_assistant_messages,
                 conversation_id=conversation_id,
@@ -557,15 +558,103 @@ def create_app():
                 force_database=force_database,
             )
 
-            response_obj = {
-                "id": "response.id",
-                "model": env_helper.AZURE_OPENAI_MODEL,
-                "created": "response.created",
-                "object": "response.object",
-                "choices": [{"messages": messages}],
-            }
+            if not prep["streaming"]:
+                # Non-streaming path: return the complete response at once
+                response_obj = {
+                    "id": "response.id",
+                    "model": env_helper.AZURE_OPENAI_MODEL,
+                    "created": "response.created",
+                    "object": "response.object",
+                    "choices": [{"messages": prep["messages"]}],
+                }
+                return jsonify(response_obj), 200
 
-            return jsonify(response_obj), 200
+            # Phase 2 (sync generator): stream LLM answer tokens to the client
+            question = prep["question"]
+            source_documents = prep["source_documents"]
+            llm_messages = prep["llm_messages"]
+            llm_model = prep["model"]
+
+            def generate():
+                from backend.batch.utilities.parser.output_parser_tool import OutputParserTool
+                from backend.batch.utilities.helpers.llm_helper import LLMHelper
+
+                # First line: citations + empty assistant message
+                citations = []
+                for doc in source_documents:
+                    citations.append({
+                        "content": doc.get_markdown_url() + "\n\n\n" + doc.content,
+                        "id": doc.id,
+                        "chunk_id": (
+                            re.findall(r"\d+", doc.chunk_id)[-1]
+                            if doc.chunk_id is not None
+                            else doc.chunk
+                        ),
+                        "title": doc.title,
+                        "filepath": doc.get_filename(include_path=True),
+                        "url": doc.get_markdown_url(),
+                    })
+                tool_content = json.dumps(
+                    {"citations": citations, "intent": question},
+                    ensure_ascii=False,
+                )
+                response_obj = {
+                    "id": "response.id",
+                    "model": env_helper.AZURE_OPENAI_MODEL,
+                    "created": "response.created",
+                    "object": "response.object",
+                    "choices": [{
+                        "messages": [
+                            {"role": "tool", "content": tool_content, "end_turn": False},
+                            {"role": "assistant", "content": "", "end_turn": False},
+                        ]
+                    }],
+                }
+                yield json.dumps(response_obj, ensure_ascii=False) + "\n"
+
+                # Stream LLM answer tokens
+                llm_helper = LLMHelper()
+                stream = llm_helper.get_chat_completion_streaming(
+                    llm_messages, model=llm_model, temperature=0
+                )
+                accumulated_answer = ""
+                for chunk in stream:
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
+                    if delta.content:
+                        accumulated_answer += delta.content
+                        response_obj = {
+                            "id": "response.id",
+                            "model": env_helper.AZURE_OPENAI_MODEL,
+                            "created": "response.created",
+                            "object": "response.object",
+                            "choices": [{
+                                "messages": [
+                                    {"role": "tool", "content": tool_content, "end_turn": False},
+                                    {"role": "assistant", "content": accumulated_answer, "end_turn": False},
+                                ]
+                            }],
+                        }
+                        yield json.dumps(response_obj, ensure_ascii=False) + "\n"
+
+                # Final line: fully parsed response with end_turn=True
+                parser = OutputParserTool()
+                final_messages = parser.parse(
+                    question=question,
+                    answer=accumulated_answer,
+                    source_documents=source_documents,
+                )
+                response_obj = {
+                    "id": "response.id",
+                    "model": env_helper.AZURE_OPENAI_MODEL,
+                    "created": "response.created",
+                    "object": "response.object",
+                    "choices": [{"messages": final_messages}],
+                }
+                yield json.dumps(response_obj, ensure_ascii=False) + "\n"
+
+            return Response(generate(), mimetype="application/json-lines")
 
         except APIStatusError as e:
             error_message = str(e)
@@ -585,7 +674,6 @@ def create_app():
 
     @app.route("/api/conversation", methods=["POST"])
     async def conversation():
-        ConfigHelper.get_active_config_or_default.cache_clear()
         result = ConfigHelper.get_active_config_or_default()
         conversation_flow = result.prompts.conversational_flow
         if conversation_flow == ConversationFlow.CUSTOM.value:

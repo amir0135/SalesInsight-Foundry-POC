@@ -523,34 +523,59 @@ class SalesInsightAgent:
         data: pd.DataFrame,
         explanation: str,
     ) -> str:
-        """Generate a natural language summary of the results."""
+        """Generate a natural language summary of the results using the LLM."""
         if data.empty:
             return "No data found matching your query."
 
-        # Get basic stats
+        # Build a compact data snapshot for the LLM (first 20 rows)
+        sample = data.head(20).to_csv(index=False)
+
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a helpful data analyst assistant. The user asked a question "
+                    "about their sales data and a SQL query was run. You are given the "
+                    "column names and result rows below.\n\n"
+                    "Write a clear, friendly, natural-language answer to the user's question "
+                    "based on the data. Highlight the key insights, totals, or trends. "
+                    "Use specific numbers from the data. Keep it concise (2-4 sentences). "
+                    "Do NOT output tables, SQL, or code."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Question: {question}\n\n"
+                    f"Total rows returned: {len(data)}\n\n"
+                    f"Data (CSV):\n{sample}"
+                ),
+            },
+        ]
+
+        try:
+            response = self._openai_client.chat.completions.create(
+                model=self.env_helper.AZURE_OPENAI_MODEL,
+                messages=messages,  # type: ignore[arg-type]
+                max_tokens=300,
+                temperature=0,
+            )
+            summary = (response.choices[0].message.content or "").strip()
+            if summary:
+                return summary
+        except Exception as e:
+            logger.warning("LLM summary generation failed, falling back to basic summary: %s", e)
+
+        # Fallback: basic stats summary
         row_count = len(data)
-        col_count = len(data.columns)
-
-        # Find numeric columns for aggregation
         numeric_cols = data.select_dtypes(include=["number"]).columns.tolist()
-
-        summary_parts = [f"Found {row_count} results."]
-
+        parts = [f"Found {row_count} results."]
         if numeric_cols:
             first_numeric = numeric_cols[0]
-            total = data[first_numeric].sum()
-            summary_parts.append(
-                f"Total {first_numeric}: {total:,.0f}"
-            )
-
-            if row_count > 1:
-                top_value = data[first_numeric].max()
-                summary_parts.append(f"Maximum value: {top_value:,.0f}")
-
+            parts.append(f"Total {first_numeric}: {data[first_numeric].sum():,.0f}")
         if explanation:
-            summary_parts.append(explanation)
-
-        return " ".join(summary_parts)
+            parts.append(explanation)
+        return " ".join(parts)
 
     def test_connection(self) -> bool:
         """Test connectivity to all required services."""

@@ -46,6 +46,25 @@ functionaltest: ## 🧪 Run the functional tests
 	@echo -e "\e[34m$@\e[0m" || true
 	@poetry run pytest code/tests/functional -m "functional"
 
+evaluate: ## 📊 Run NL2SQL evaluation (offline - no LLM)
+	@echo -e "\e[34m$@\e[0m" || true
+	@poetry run python scripts/evaluation/generate_golden_dataset.py
+	@poetry run python scripts/evaluation/run_evaluation.py --offline
+
+evaluate-llm: ## 📊 Run NL2SQL evaluation (full - with LLM)
+	@echo -e "\e[34m$@\e[0m" || true
+	@poetry run python scripts/evaluation/generate_golden_dataset.py
+	@poetry run python scripts/evaluation/run_evaluation.py
+
+evaluate-full: ## 📊 Run NL2SQL evaluation (full - with Azure AI Foundry evaluation)
+	@echo -e "\e[34m$@\e[0m" || true
+	@poetry run python scripts/evaluation/generate_golden_dataset.py
+	@poetry run python scripts/evaluation/run_evaluation.py --foundry --output scripts/evaluation/reports/eval_report.json
+
+generate-eval-dataset: ## 📊 Regenerate golden dataset from current data files
+	@echo -e "\e[34m$@\e[0m" || true
+	@poetry run python scripts/evaluation/generate_golden_dataset.py
+
 uitest: ## 🧪 Run the ui tests in headless mode
 	@echo -e "\e[34m$@\e[0m" || true
 	@cd tests/integration/ui && npm install && npx cypress run --env ADMIN_WEBSITE_NAME=$(ADMIN_WEBSITE_NAME),FRONTEND_WEBSITE_NAME=$(FRONTEND_WEBSITE_NAME)

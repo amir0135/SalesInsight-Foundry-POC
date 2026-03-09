@@ -148,6 +148,18 @@ class LLMHelper:
             **kwargs
         )
 
+    def get_chat_completion_streaming(
+        self, messages: list[dict], model: str | None = None, **kwargs
+    ):
+        """Return a streaming chat completion iterator."""
+        return self.openai_client.chat.completions.create(
+            model=model or self.llm_model,
+            messages=messages,
+            max_tokens=self.llm_max_tokens,
+            stream=True,
+            **kwargs
+        )
+
     def get_fast_chat_completion(
         self, messages: list[dict], max_tokens: int = 500, **kwargs
     ):
@@ -173,6 +185,26 @@ class LLMHelper:
             return AzureChatCompletion(
                 service_id=service_id,
                 deployment_name=self.llm_model,
+                endpoint=self.env_helper.AZURE_OPENAI_ENDPOINT,
+                api_version=self.env_helper.AZURE_OPENAI_API_VERSION,
+                ad_token_provider=self.token_provider,
+            )
+
+    def get_sk_fast_chat_completion_service(self, service_id: str):
+        """Return an SK chat service using the fast (mini) model for lightweight tasks like tool selection."""
+        fast_model = self.env_helper.AZURE_OPENAI_FAST_MODEL
+        if self.auth_type_keys:
+            return AzureChatCompletion(
+                service_id=service_id,
+                deployment_name=fast_model,
+                endpoint=self.env_helper.AZURE_OPENAI_ENDPOINT,
+                api_version=self.env_helper.AZURE_OPENAI_API_VERSION,
+                api_key=self.env_helper.OPENAI_API_KEY,
+            )
+        else:
+            return AzureChatCompletion(
+                service_id=service_id,
+                deployment_name=fast_model,
                 endpoint=self.env_helper.AZURE_OPENAI_ENDPOINT,
                 api_version=self.env_helper.AZURE_OPENAI_API_VERSION,
                 ad_token_provider=self.token_provider,

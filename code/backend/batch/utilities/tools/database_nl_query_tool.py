@@ -364,8 +364,50 @@ class DatabaseNLQueryTool:
                 source_documents=[],
             )
 
+    def _generate_nl_summary(self, question: str, columns: list, rows: list) -> str:
+        """Use the LLM to produce a conversational natural-language answer from query results."""
+        # Build a compact data snapshot (first 20 rows max to stay within token limits)
+        sample_rows = rows[:20]
+        data_lines = [", ".join(str(c) for c in columns)]
+        for row in sample_rows:
+            data_lines.append(", ".join("" if v is None else str(v) for v in row))
+        data_snapshot = "\n".join(data_lines)
+
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a helpful data analyst assistant. The user asked a question "
+                    "about their sales data and a SQL query was run. You are given the "
+                    "column names and result rows below.\n\n"
+                    "Write a clear, friendly, natural-language answer to the user's question "
+                    "based on the data. Highlight the key insights, totals, or trends. "
+                    "Use specific numbers from the data. Keep it concise (2-4 sentences). "
+                    "Do NOT output tables, SQL, or code."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"Question: {question}\n\n"
+                    f"Total rows returned: {len(rows)}\n\n"
+                    f"Data (columns then rows):\n{data_snapshot}"
+                ),
+            },
+        ]
+
+        try:
+            response = self.llm_helper.get_fast_chat_completion(messages, max_tokens=300)
+            summary = response.choices[0].message.content.strip()
+            if summary:
+                return summary
+        except Exception as e:
+            logger.warning("LLM natural-language summary failed, skipping: %s", e)
+
+        return ""
+
     def _format_result(self, result: Dict, question: str) -> str:
-        """Format query result as markdown table with optional visualization."""
+        """Format query result as a natural-language answer plus markdown table with optional visualization."""
         import json
         from ..helpers.database.visualization_helper import analyze_data_for_visualization
 
@@ -376,14 +418,23 @@ class DatabaseNLQueryTool:
         if not rows:
             return "No data found for your query."
 
+        # Generate a natural-language summary via LLM
+        nl_summary = self._generate_nl_summary(question, columns, rows)
+
         # Generate visualization config if data is suitable for charting
         viz_config = analyze_data_for_visualization(columns, rows, question)
 
         # Build response
-        lines = [
-            f"**Query Results** | Source: {metadata.get('source', 'unknown')} | Rows: {len(rows)}",
-            "",
-        ]
+        lines = []
+
+        if nl_summary:
+            lines.append(nl_summary)
+            lines.append("")
+
+        lines.append(
+            f"**Query Results** | Source: {metadata.get('source', 'unknown')} | Rows: {len(rows)}"
+        )
+        lines.append("")
 
         # Add visualization JSON block if chart is appropriate
         if viz_config:

@@ -65,6 +65,11 @@ class FoundryClientHelper:
             # Build the Foundry project endpoint if not already in the right form
             if project_name and "/api/projects/" not in endpoint:
                 endpoint = endpoint.rstrip("/")
+                # Convert legacy .openai.azure.com to .services.ai.azure.com
+                # which is the endpoint format required by the AgentsClient SDK
+                endpoint = endpoint.replace(
+                    ".openai.azure.com", ".services.ai.azure.com"
+                )
                 endpoint = f"{endpoint}/api/projects/{project_name}"
 
             logger.info("Creating AgentsClient for endpoint=%s", endpoint)
