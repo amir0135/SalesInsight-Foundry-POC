@@ -4,6 +4,43 @@ This module contains the entry point for the application.
 
 import os
 import logging
+import socket
+
+# Workaround: macOS mDNSResponder cannot resolve .search.windows.net CNAME chain
+# through corporate DNS (207.46.216.45). Pre-resolve and cache via subprocess.
+_SEARCH_HOST = os.getenv("AZURE_SEARCH_SERVICE", "")
+if _SEARCH_HOST:
+    import subprocess
+    import re
+    from urllib.parse import urlparse
+
+    _parsed = urlparse(_SEARCH_HOST)
+    _hostname = _parsed.hostname or _SEARCH_HOST
+    try:
+        _result = subprocess.run(
+            ["dig", "+short", _hostname],
+            capture_output=True, text=True, timeout=10
+        )
+        _lines = _result.stdout.strip().split("\n")
+        _ip = None
+        for _line in reversed(_lines):
+            if re.match(r"^\d+\.\d+\.\d+\.\d+$", _line.strip()):
+                _ip = _line.strip()
+                break
+        if _ip:
+            _orig_getaddrinfo = socket.getaddrinfo
+
+            def _patched_getaddrinfo(host, port, *args, **kwargs):
+                if host == _hostname:
+                    return _orig_getaddrinfo(_ip, port, *args, **kwargs)
+                return _orig_getaddrinfo(host, port, *args, **kwargs)
+
+            socket.getaddrinfo = _patched_getaddrinfo
+            import sys
+            print(f"DNS workaround active: {_hostname} -> {_ip}", file=sys.stderr, flush=True)
+    except Exception:
+        pass  # Fall back to normal resolution
+
 from azure.monitor.opentelemetry import configure_azure_monitor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 

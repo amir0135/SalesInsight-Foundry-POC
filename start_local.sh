@@ -130,64 +130,6 @@ if [ "$SKIP_AZURE" = false ]; then
 fi
 
 # =============================================================================
-# Azure Storage Account Configuration
-# =============================================================================
-# Ensures storage account is accessible for local development.
-# Settings may reset daily due to Azure policies, so this runs on every startup.
-
-configure_azure_storage() {
-    echo -e "${BLUE}[Azure Storage] Configuring storage account for local access...${NC}"
-
-    # Get storage account name from .env
-    STORAGE_ACCOUNT=$(grep -E "^AZURE_BLOB_ACCOUNT_NAME=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || echo "")
-    RESOURCE_GROUP=$(grep -E "^AZURE_RESOURCE_GROUP=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || echo "")
-
-    if [ -z "$STORAGE_ACCOUNT" ]; then
-        echo -e "${YELLOW}  ⚠ AZURE_BLOB_ACCOUNT_NAME not found in .env, skipping storage config${NC}"
-        return 0
-    fi
-
-    # Try to infer resource group if not set
-    if [ -z "$RESOURCE_GROUP" ]; then
-        # Try to get it from Azure
-        RESOURCE_GROUP=$(az storage account list --query "[?name=='$STORAGE_ACCOUNT'].resourceGroup" -o tsv 2>/dev/null || echo "")
-    fi
-
-    if [ -z "$RESOURCE_GROUP" ]; then
-        echo -e "${YELLOW}  ⚠ Could not determine resource group for storage account${NC}"
-        return 0
-    fi
-
-    # Check and enable public network access if disabled
-    PUBLIC_ACCESS=$(az storage account show -n "$STORAGE_ACCOUNT" -g "$RESOURCE_GROUP" --query "publicNetworkAccess" -o tsv 2>/dev/null || echo "")
-
-    if [ "$PUBLIC_ACCESS" = "Disabled" ]; then
-        echo -e "${YELLOW}  Public network access is disabled, enabling for local dev...${NC}"
-        if az storage account update -n "$STORAGE_ACCOUNT" -g "$RESOURCE_GROUP" --public-network-access Enabled > /dev/null 2>&1; then
-            echo -e "${GREEN}  ✓ Public network access enabled${NC}"
-        else
-            echo -e "${RED}  ✗ Failed to enable public network access${NC}"
-            echo -e "${YELLOW}    You may need to enable it manually in Azure Portal${NC}"
-        fi
-    else
-        echo -e "${GREEN}  ✓ Public network access is enabled${NC}"
-    fi
-
-    # Verify RBAC roles for current user (informational only)
-    USER_ID=$(az ad signed-in-user show --query id -o tsv 2>/dev/null || echo "")
-    if [ -n "$USER_ID" ]; then
-        ROLES=$(az role assignment list --assignee "$USER_ID" --scope "/subscriptions/$(az account show --query id -o tsv)/resourceGroups/$RESOURCE_GROUP/providers/Microsoft.Storage/storageAccounts/$STORAGE_ACCOUNT" --query "[].roleDefinitionName" -o tsv 2>/dev/null | tr '\n' ', ' || echo "")
-        if [ -n "$ROLES" ]; then
-            echo -e "${GREEN}  ✓ Your storage roles: ${ROLES%,}${NC}"
-        fi
-    fi
-}
-
-if [ "$SKIP_AZURE" = false ]; then
-    configure_azure_storage
-fi
-
-# =============================================================================
 # Python Environment Setup
 # =============================================================================
 # Ensures venv exists and all dependencies are installed - works on any computer
@@ -636,6 +578,162 @@ configure_cosmos_db() {
     echo ""
 }
 
+# Configure Cognitive Services (OpenAI, Document Intelligence, Content Safety, Speech)
+configure_cognitive_services() {
+    echo -e "${BLUE}[Azure] Configuring Cognitive Services for local development...${NC}"
+
+    RESOURCE_GROUP=$(grep -E "^AZURE_RESOURCE_GROUP=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || true)
+    if [ -z "$RESOURCE_GROUP" ]; then
+        echo -e "${YELLOW}  ⚠ AZURE_RESOURCE_GROUP not found in .env. Skipping.${NC}"
+        return 0
+    fi
+
+    # Map: env_var_for_name → display_label
+    # OpenAI uses AZURE_OPENAI_RESOURCE, others are extracted from endpoint URLs
+    declare -a SERVICE_NAMES=()
+    declare -a SERVICE_LABELS=()
+
+    # OpenAI
+    OPENAI_NAME=$(grep -E "^AZURE_OPENAI_RESOURCE=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || true)
+    if [ -n "$OPENAI_NAME" ]; then
+        SERVICE_NAMES+=("$OPENAI_NAME")
+        SERVICE_LABELS+=("Azure OpenAI")
+    fi
+
+    # Document Intelligence (extract name from endpoint URL)
+    DI_ENDPOINT=$(grep -E "^AZURE_FORM_RECOGNIZER_ENDPOINT=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || true)
+    if [ -n "$DI_ENDPOINT" ]; then
+        DI_NAME=$(echo "$DI_ENDPOINT" | sed -E 's|https://([^.]+)\..*|\1|')
+        if [ -n "$DI_NAME" ]; then
+            SERVICE_NAMES+=("$DI_NAME")
+            SERVICE_LABELS+=("Document Intelligence")
+        fi
+    fi
+
+    # Content Safety (extract name from endpoint URL)
+    CS_ENDPOINT=$(grep -E "^AZURE_CONTENT_SAFETY_ENDPOINT=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || true)
+    if [ -n "$CS_ENDPOINT" ]; then
+        CS_NAME=$(echo "$CS_ENDPOINT" | sed -E 's|https://([^.]+)\..*|\1|')
+        if [ -n "$CS_NAME" ]; then
+            SERVICE_NAMES+=("$CS_NAME")
+            SERVICE_LABELS+=("Content Safety")
+        fi
+    fi
+
+    # Speech
+    SPEECH_NAME=$(grep -E "^AZURE_SPEECH_SERVICE_NAME=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || true)
+    if [ -n "$SPEECH_NAME" ]; then
+        SERVICE_NAMES+=("$SPEECH_NAME")
+        SERVICE_LABELS+=("Speech Services")
+    fi
+
+    if [ ${#SERVICE_NAMES[@]} -eq 0 ]; then
+        echo -e "${YELLOW}  ⚠ No Cognitive Services found in .env. Skipping.${NC}"
+        return 0
+    fi
+
+    for i in "${!SERVICE_NAMES[@]}"; do
+        NAME="${SERVICE_NAMES[$i]}"
+        LABEL="${SERVICE_LABELS[$i]}"
+
+        PUBLIC_ACCESS=$(timeout 15 az cognitiveservices account show \
+            --name "$NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query "properties.publicNetworkAccess" -o tsv 2>/dev/null || true)
+
+        if [ "$PUBLIC_ACCESS" = "Disabled" ]; then
+            echo -e "${YELLOW}  Enabling public network access on $LABEL ($NAME)...${NC}"
+            timeout 30 az cognitiveservices account update \
+                --name "$NAME" \
+                --resource-group "$RESOURCE_GROUP" \
+                --public-network-access Enabled \
+                --output none 2>/dev/null && \
+                echo -e "${GREEN}  ✓ $LABEL: public network access enabled${NC}" || \
+                echo -e "${YELLOW}  ⚠ $LABEL: could not enable public access${NC}"
+        else
+            echo -e "${GREEN}  ✓ $LABEL ($NAME): public network access OK${NC}"
+        fi
+    done
+
+    echo -e "${GREEN}✓ Cognitive Services configuration complete${NC}"
+    echo ""
+}
+
+# Configure Azure AI Search
+configure_search_service() {
+    echo -e "${BLUE}[Azure] Configuring Azure AI Search for local development...${NC}"
+
+    SEARCH_SERVICE=$(grep -E "^AZURE_SEARCH_SERVICE=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || true)
+    RESOURCE_GROUP=$(grep -E "^AZURE_RESOURCE_GROUP=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || true)
+
+    if [ -z "$SEARCH_SERVICE" ] || [ -z "$RESOURCE_GROUP" ]; then
+        echo -e "${YELLOW}  ⚠ AZURE_SEARCH_SERVICE or AZURE_RESOURCE_GROUP not found in .env. Skipping.${NC}"
+        return 0
+    fi
+
+    PUBLIC_ACCESS=$(timeout 15 az search service show \
+        --name "$SEARCH_SERVICE" \
+        --resource-group "$RESOURCE_GROUP" \
+        --query "publicNetworkAccess" -o tsv 2>/dev/null || true)
+
+    if [ "$PUBLIC_ACCESS" = "disabled" ]; then
+        echo -e "${YELLOW}  Enabling public network access on AI Search ($SEARCH_SERVICE)...${NC}"
+        timeout 30 az search service update \
+            --name "$SEARCH_SERVICE" \
+            --resource-group "$RESOURCE_GROUP" \
+            --public-access enabled \
+            --output none 2>/dev/null && \
+            echo -e "${GREEN}  ✓ AI Search: public network access enabled${NC}" || \
+            echo -e "${YELLOW}  ⚠ AI Search: could not enable public access${NC}"
+    else
+        echo -e "${GREEN}  ✓ AI Search ($SEARCH_SERVICE): public network access OK${NC}"
+    fi
+
+    echo -e "${GREEN}✓ AI Search configuration complete${NC}"
+    echo ""
+}
+
+# Configure Key Vault
+configure_key_vault() {
+    echo -e "${BLUE}[Azure] Configuring Key Vault for local development...${NC}"
+
+    KV_ENDPOINT=$(grep -E "^AZURE_KEY_VAULT_ENDPOINT=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || true)
+    RESOURCE_GROUP=$(grep -E "^AZURE_RESOURCE_GROUP=" .env | cut -d'=' -f2 | tr -d '"' | tr -d "'" || true)
+
+    if [ -z "$KV_ENDPOINT" ] || [ -z "$RESOURCE_GROUP" ]; then
+        echo -e "${YELLOW}  ⚠ AZURE_KEY_VAULT_ENDPOINT or AZURE_RESOURCE_GROUP not found in .env. Skipping.${NC}"
+        return 0
+    fi
+
+    # Extract vault name from endpoint URL
+    KV_NAME=$(echo "$KV_ENDPOINT" | sed -E 's|https://([^.]+)\..*|\1|')
+    if [ -z "$KV_NAME" ]; then
+        echo -e "${YELLOW}  ⚠ Could not parse Key Vault name from endpoint. Skipping.${NC}"
+        return 0
+    fi
+
+    PUBLIC_ACCESS=$(timeout 15 az keyvault show \
+        --name "$KV_NAME" \
+        --resource-group "$RESOURCE_GROUP" \
+        --query "properties.publicNetworkAccess" -o tsv 2>/dev/null || true)
+
+    if [ "$PUBLIC_ACCESS" = "Disabled" ]; then
+        echo -e "${YELLOW}  Enabling public network access on Key Vault ($KV_NAME)...${NC}"
+        timeout 30 az keyvault update \
+            --name "$KV_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --public-network-access Enabled \
+            --output none 2>/dev/null && \
+            echo -e "${GREEN}  ✓ Key Vault: public network access enabled${NC}" || \
+            echo -e "${YELLOW}  ⚠ Key Vault: could not enable public access${NC}"
+    else
+        echo -e "${GREEN}  ✓ Key Vault ($KV_NAME): public network access OK${NC}"
+    fi
+
+    echo -e "${GREEN}✓ Key Vault configuration complete${NC}"
+    echo ""
+}
+
 # Run Azure configuration (unless --skip-azure flag is passed)
 if [ "$SKIP_AZURE" = true ]; then
     echo -e "${YELLOW}[Azure] Skipping Azure configuration (--skip-azure flag)${NC}"
@@ -643,6 +741,9 @@ if [ "$SKIP_AZURE" = true ]; then
 else
     configure_azure_storage
     configure_cosmos_db
+    configure_cognitive_services
+    configure_search_service
+    configure_key_vault
 fi
 
 # Check if PostgreSQL container is running (for Database/Redshift testing)
@@ -726,10 +827,10 @@ fi
 
 # Kill any existing processes on our ports (in parallel for speed)
 echo -e "${YELLOW}Cleaning up existing processes...${NC}"
-(lsof -ti:5050 | xargs kill -9 2>/dev/null || true) &
-(lsof -ti:5173 | xargs kill -9 2>/dev/null || true) &
-(lsof -ti:8501 | xargs kill -9 2>/dev/null || true) &
-(lsof -ti:7071 | xargs kill -9 2>/dev/null || true) &
+(lsof -ti:5060 | xargs kill -9 2>/dev/null || true) &
+(lsof -ti:5174 | xargs kill -9 2>/dev/null || true) &
+(lsof -ti:8502 | xargs kill -9 2>/dev/null || true) &
+(lsof -ti:7072 | xargs kill -9 2>/dev/null || true) &
 wait
 
 # Export environment variables for Database/Redshift
@@ -752,16 +853,16 @@ echo -e "${BLUE}--- Starting All Services in Parallel ---${NC}"
 
 # Start all services in parallel for faster startup
 # Flask backend on port 5050
-echo -e "${GREEN}Starting Flask backend on http://localhost:5050${NC}"
+echo -e "${GREEN}Starting Flask backend on http://localhost:5060${NC}"
 cd code
-nohup $VENV_PYTHON -m flask run --host=127.0.0.1 --port=5050 > /tmp/flask.log 2>&1 &
+nohup $VENV_PYTHON -m flask run --host=127.0.0.1 --port=5060 > /tmp/flask.log 2>&1 &
 FLASK_PID=$!
 cd ..
 
 # Vite frontend on port 5173 (start immediately, don't wait for Flask)
-echo -e "${GREEN}Starting Vite frontend on http://localhost:5173${NC}"
+echo -e "${GREEN}Starting Vite frontend on http://localhost:5174${NC}"
 cd code/frontend
-nohup npm run dev > /tmp/vite.log 2>&1 &
+nohup npx vite --port 5174 > /tmp/vite.log 2>&1 &
 VITE_PID=$!
 
 # Quick check if Vite crashed immediately (e.g., rollup issue)
@@ -776,16 +877,16 @@ fi
 cd ../..
 
 # Start Streamlit Admin UI on port 8501 (parallel)
-echo -e "${GREEN}Starting Streamlit Admin UI on http://localhost:8501${NC}"
+echo -e "${GREEN}Starting Streamlit Admin UI on http://localhost:8502${NC}"
 cd code/backend
-nohup $VENV_PYTHON -m streamlit run Admin.py --server.port 8501 --server.headless true > /tmp/streamlit.log 2>&1 &
+nohup $VENV_PYTHON -m streamlit run Admin.py --server.port 8502 --server.headless true > /tmp/streamlit.log 2>&1 &
 STREAMLIT_PID=$!
 cd ../..
 
 # Start Azure Functions on port 7071 (parallel)
-echo -e "${GREEN}Starting Azure Functions on http://localhost:7071${NC}"
+echo -e "${GREEN}Starting Azure Functions on http://localhost:7072${NC}"
 cd code/backend/batch
-nohup func host start --port 7071 > /tmp/functions.log 2>&1 &
+nohup func host start --port 7072 > /tmp/functions.log 2>&1 &
 FUNC_PID=$!
 cd ../../..
 
@@ -796,19 +897,19 @@ sleep 5
 
 # Check all services at once
 echo -e "${BLUE}--- Service Status ---${NC}"
-lsof -i:5050 > /dev/null 2>&1 && echo -e "${GREEN}✓ Flask backend running on port 5050${NC}" || echo -e "${YELLOW}⚠ Flask starting... (check /tmp/flask.log)${NC}"
-lsof -i:5173 > /dev/null 2>&1 && echo -e "${GREEN}✓ Vite frontend running on port 5173${NC}" || echo -e "${YELLOW}⚠ Vite starting... (check /tmp/vite.log)${NC}"
-lsof -i:8501 > /dev/null 2>&1 && echo -e "${GREEN}✓ Streamlit Admin UI running on port 8501${NC}" || echo -e "${YELLOW}⚠ Streamlit starting... (check /tmp/streamlit.log)${NC}"
-lsof -i:7071 > /dev/null 2>&1 && echo -e "${GREEN}✓ Azure Functions running on port 7071${NC}" || echo -e "${YELLOW}⚠ Functions starting... (check /tmp/functions.log)${NC}"
+lsof -i:5060 > /dev/null 2>&1 && echo -e "${GREEN}✓ Flask backend running on port 5060${NC}" || echo -e "${YELLOW}⚠ Flask starting... (check /tmp/flask.log)${NC}"
+lsof -i:5174 > /dev/null 2>&1 && echo -e "${GREEN}✓ Vite frontend running on port 5174${NC}" || echo -e "${YELLOW}⚠ Vite starting... (check /tmp/vite.log)${NC}"
+lsof -i:8502 > /dev/null 2>&1 && echo -e "${GREEN}✓ Streamlit Admin UI running on port 8502${NC}" || echo -e "${YELLOW}⚠ Streamlit starting... (check /tmp/streamlit.log)${NC}"
+lsof -i:7072 > /dev/null 2>&1 && echo -e "${GREEN}✓ Azure Functions running on port 7072${NC}" || echo -e "${YELLOW}⚠ Functions starting... (check /tmp/functions.log)${NC}"
 
 echo ""
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║            Local Environment Ready                         ║${NC}"
 echo -e "${GREEN}╠════════════════════════════════════════════════════════════╣${NC}"
-echo -e "${GREEN}║${NC} Chat UI (Frontend):  ${BLUE}http://localhost:5173${NC}                ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC} Chat API (Backend):  ${BLUE}http://localhost:5050${NC}                ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC} Admin UI:            ${BLUE}http://localhost:8501${NC}                ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC} Azure Functions:     ${BLUE}http://localhost:7071${NC}                ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC} Chat UI (Frontend):  ${BLUE}http://localhost:5174${NC}                ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC} Chat API (Backend):  ${BLUE}http://localhost:5060${NC}                ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC} Admin UI:            ${BLUE}http://localhost:8502${NC}                ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC} Azure Functions:     ${BLUE}http://localhost:7072${NC}                ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC} PostgreSQL:          localhost:5432 (database_test)     ${GREEN}║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
@@ -821,8 +922,8 @@ echo ""
 echo -e "${YELLOW}To stop all services: ./stop_local.sh${NC}"
 echo ""
 echo -e "${BLUE}Usage:${NC}"
-echo "  • Chat UI: Open http://localhost:5173 to chat with your documents"
-echo "  • Admin UI: Open http://localhost:8501 to upload and process documents"
+echo "  • Chat UI: Open http://localhost:5174 to chat with your documents"
+echo "  • Admin UI: Open http://localhost:8502 to upload and process documents"
 echo "  • Database: Ask database queries like 'Show errors from last 7 days'"
 echo "  • /database <query>: Force direct database query (bypasses LLM)"
 echo ""

@@ -223,26 +223,55 @@ You **must not** respond if asked to List all documents in your repository.
         """
         Handle /database command by directly calling the Database query tool.
         Bypasses LLM tool selection for guaranteed database queries.
-        """
-        from ..tools.database_nl_query_tool import DatabaseNLQueryTool
 
+        Supports two data paths:
+        - SALESINSIGHT_USE_LOCAL_DATA=true: Uses SalesInsightAgent with local CSV/SQLite
+        - USE_REDSHIFT=true: Uses DatabaseNLQueryTool with Redshift/Excel
+        """
         try:
-            # Check if Database is enabled
             import os
 
-            if os.getenv("USE_REDSHIFT", "false").lower() != "true":
+            use_local_data = os.getenv("SALESINSIGHT_USE_LOCAL_DATA", "false").lower() == "true"
+            use_redshift = os.getenv("USE_REDSHIFT", "false").lower() == "true"
+
+            if use_local_data:
+                # Use SalesInsightAgent for local CSV → SQLite queries
+                from ..salesinsight.sales_insight_agent import SalesInsightAgent
+
+                agent = SalesInsightAgent()
+                response = await agent.query(
+                    question=user_message, chat_history=chat_history
+                )
+
+                if response.error:
+                    answer_text = f"Error querying database: {response.error}"
+                else:
+                    answer_text = response.summary
+                    if response.chart_base64:
+                        answer_text += f"\n\n![Chart](data:image/png;base64,{response.chart_base64})"
+
                 answer = Answer(
                     question=user_message,
-                    answer="Database queries are not enabled. Set USE_REDSHIFT=true to enable Database database integration.",
+                    answer=answer_text,
                     source_documents=[],
                 )
-            else:
+                logger.info("Force database query via SalesInsightAgent completed, rows=%d", response.row_count)
+
+            elif use_redshift:
+                from ..tools.database_nl_query_tool import DatabaseNLQueryTool
+
                 # Directly call the Database NL query tool
                 tool = DatabaseNLQueryTool()
                 answer = tool.query_with_natural_language(
                     question=user_message, max_rows=100
                 )
-                logger.info("Force database query executed successfully")
+                logger.info("Force database query via DatabaseNLQueryTool executed successfully")
+            else:
+                answer = Answer(
+                    question=user_message,
+                    answer="Database queries are not enabled. Set SALESINSIGHT_USE_LOCAL_DATA=true (for local CSV data) or USE_REDSHIFT=true (for Redshift) to enable database integration.",
+                    source_documents=[],
+                )
 
             self.log_tokens(
                 prompt_tokens=answer.prompt_tokens or 0,

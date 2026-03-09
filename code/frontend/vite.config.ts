@@ -34,7 +34,7 @@ export default defineConfig({
         host: true,
         proxy: {
             "/api": {
-                target: "http://127.0.0.1:5050",
+                target: "http://127.0.0.1:5060",
                 changeOrigin: true,
                 secure: false
             }
