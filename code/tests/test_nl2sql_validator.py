@@ -9,8 +9,6 @@ from backend.batch.utilities.nl2sql.query_validator import (
     QueryValidator,
     AllowlistConfig,
     ValidationResult,
-    ValidationError,
-    SecurityViolationError,
 )
 
 
@@ -101,7 +99,7 @@ class TestQueryValidatorTableAllowlist:
         """Test validation with multiple tables (joins disabled)."""
         validator_config.allow_joins = False
         validator = QueryValidator(config=validator_config)
-        
+
         sql = """
             SELECT o.ItemNo, c.CustomerName
             FROM OrderHistoryLine o
@@ -249,7 +247,7 @@ class TestQueryValidatorColumnAllowlist:
             FROM OrderHistoryLine
             LIMIT 10;
         """
-        result = validator.validate(sql)
+        validator.validate(sql)
         # Note: Column validation is table-specific
         # This test assumes strict column validation is enabled
         # Adjust based on actual implementation
@@ -285,14 +283,14 @@ class TestQueryValidatorJoinHandling:
         """Test that JOINs work when enabled."""
         validator_config.allow_joins = True
         validator = QueryValidator(config=validator_config)
-        
+
         sql = """
             SELECT o.ItemNo, c.CustomerName
             FROM OrderHistoryLine o
             JOIN Customers c ON o.CustomerNo = c.CustomerNo
             LIMIT 10;
         """
-        result = validator.validate(sql)
+        validator.validate(sql)
         # Should pass table validation (both tables allowed)
         # JOINs are now allowed
 

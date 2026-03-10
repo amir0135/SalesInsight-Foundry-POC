@@ -247,27 +247,26 @@ ADVANCED_IMAGE_PROCESSING_MAX_IMAGES=1
 # =============================================================================
 # Database Data Integration (optional)
 # =============================================================================
-# Set USE_REDSHIFT=true to enable database queries via natural language
-# The local PostgreSQL container simulates the production Redshift database
+# Configure POSTGRES_HOST to enable database queries via natural language
+# The local PostgreSQL container provides the database
 
-USE_REDSHIFT=true
 DATABASE_DATA_DIR=data/testtrack
 
 # Local PostgreSQL settings (for testing)
-REDSHIFT_HOST=localhost
-REDSHIFT_PORT=5432
-REDSHIFT_DB=database_test
-REDSHIFT_USER=testuser
-REDSHIFT_PASSWORD=testpassword
-REDSHIFT_SCHEMA=public
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=database_test
+POSTGRES_USER=testuser
+POSTGRES_PASSWORD=testpassword
+POSTGRES_SCHEMA=public
 
-# Production Redshift settings (uncomment and fill for production)
-# REDSHIFT_HOST=your-cluster.region.redshift.amazonaws.com
-# REDSHIFT_PORT=5439
-# REDSHIFT_DB=your_database
-# REDSHIFT_USER=your_user
-# REDSHIFT_PASSWORD=your_password
-# REDSHIFT_SCHEMA=public
+# Production PostgreSQL settings (uncomment and fill for production)
+# POSTGRES_HOST=your-database-host.example.com
+# POSTGRES_PORT=5432
+# POSTGRES_DB=your_database
+# POSTGRES_USER=your_user
+# POSTGRES_PASSWORD=your_password
+# POSTGRES_SCHEMA=public
 EOF
 
 echo -e "${GREEN}✓ Generated .env file${NC}"

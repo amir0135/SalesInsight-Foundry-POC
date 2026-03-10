@@ -191,8 +191,6 @@ def get_schema_info():
         }
     """
     try:
-        from backend.batch.utilities.salesinsight import SalesInsightAgent
-
         table_name = request.args.get("table_name")
 
         agent = get_sales_insight_agent()

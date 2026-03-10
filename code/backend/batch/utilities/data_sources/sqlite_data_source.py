@@ -24,7 +24,7 @@ class SQLiteDataSource(BaseDataSource):
 
     This data source loads multiple file formats into an in-memory SQLite database,
     allowing local testing of NL2SQL queries without Snowflake.
-    
+
     Supported formats:
     - CSV files (.csv)
     - Excel files (.xlsx, .xls)
@@ -93,7 +93,7 @@ class SQLiteDataSource(BaseDataSource):
     def from_files(cls, files: Dict[str, str]) -> "SQLiteDataSource":
         """
         Create a SQLiteDataSource from multiple files of various formats.
-        
+
         File type is detected from extension (.csv, .xlsx, .xls, .pdf).
 
         Args:
@@ -101,7 +101,7 @@ class SQLiteDataSource(BaseDataSource):
 
         Returns:
             Configured SQLiteDataSource instance
-            
+
         Example:
             ds = SQLiteDataSource.from_files({
                 "orders": "data/orders.csv",
@@ -154,7 +154,7 @@ class SQLiteDataSource(BaseDataSource):
             return
 
         extension = path.suffix.lower()
-        
+
         if extension == '.csv':
             self._load_csv_to_table(table_name, file_path)
         elif extension in ('.xlsx', '.xls'):
@@ -196,7 +196,7 @@ class SQLiteDataSource(BaseDataSource):
     def _load_pdf_to_table(self, table_name: str, pdf_path: str) -> None:
         """
         Load tables from a PDF file into SQLite.
-        
+
         Uses Azure Document Intelligence to extract tables from PDFs.
         Falls back to simple table extraction if Azure is not configured.
         """
@@ -228,21 +228,21 @@ class SQLiteDataSource(BaseDataSource):
             from azure.ai.formrecognizer import DocumentAnalysisClient
             from azure.identity import DefaultAzureCredential
             from ..helpers.env_helper import EnvHelper
-            
+
             env = EnvHelper()
             endpoint = env.AZURE_FORM_RECOGNIZER_ENDPOINT
-            
+
             if not endpoint:
                 logger.info("Azure Form Recognizer not configured")
                 return None
-            
+
             credential = DefaultAzureCredential()
             client = DocumentAnalysisClient(endpoint=endpoint, credential=credential)
-            
+
             with open(pdf_path, "rb") as f:
                 poller = client.begin_analyze_document("prebuilt-layout", f)
                 result = poller.result()
-            
+
             # Extract all tables and combine them
             all_tables = []
             for table in result.tables:
@@ -254,7 +254,7 @@ class SQLiteDataSource(BaseDataSource):
                     if row_idx not in rows:
                         rows[row_idx] = {}
                     rows[row_idx][col_idx] = cell.content
-                
+
                 if rows:
                     # First row as header
                     headers = [rows.get(0, {}).get(i, f"col_{i}") for i in range(table.column_count)]
@@ -262,15 +262,15 @@ class SQLiteDataSource(BaseDataSource):
                     for row_idx in range(1, table.row_count):
                         row_data = [rows.get(row_idx, {}).get(i, "") for i in range(table.column_count)]
                         data.append(row_data)
-                    
+
                     df = pd.DataFrame(data, columns=headers)
                     all_tables.append(df)
-            
+
             if all_tables:
                 # Concatenate all tables (assuming same structure)
                 return pd.concat(all_tables, ignore_index=True)
             return None
-            
+
         except ImportError:
             logger.info("azure-ai-formrecognizer not installed")
             return None
@@ -279,15 +279,15 @@ class SQLiteDataSource(BaseDataSource):
         """Extract tables from PDF using tabula-py (fallback method)."""
         try:
             import tabula
-            
+
             # Read all tables from PDF
             tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True)
-            
+
             if tables:
                 # Concatenate all tables
                 return pd.concat(tables, ignore_index=True)
             return None
-            
+
         except ImportError:
             logger.info("tabula-py not installed. Install with: pip install tabula-py")
             return None

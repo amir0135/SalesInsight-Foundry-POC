@@ -240,7 +240,7 @@ try:
 - Request specific formatting (bullets, headers)
 - Emphasize using ALL relevant information from documents
 - Require inline citations after each fact"""
-    
+
     answering_user_prompt_help = """**User Prompt** - Sent with each question along with retrieved documents.
 
 **Required placeholders:**
@@ -307,7 +307,7 @@ Include citations [doc1], [doc2] for facts.
             key="use_on_your_data_format",
             help=use_on_your_data_format_help,
         )
-        
+
         st.markdown("### 📝 System Prompt")
         st.markdown("*Defines the AI's behavior, response style, and citation rules*")
         st.text_area(
@@ -317,7 +317,7 @@ Include citations [doc1], [doc2] for facts.
             height=500,
             disabled=not st.session_state["use_on_your_data_format"],
         )
-        
+
         st.markdown("### 💬 User Prompt")
         st.markdown("*Template sent with each question (must include {sources} and {question})*")
         st.text_area(

@@ -11,7 +11,7 @@ from utilities.helpers.embedders.embedder_factory import EmbedderFactory
 
 bp_add_url_embeddings = func.Blueprint()
 logger = logging.getLogger(__name__)
-logger.setLevel(level=os.environ.get("LOGLEVEL", "INFO").upper())
+logger.setLevel(level=os.environ.get("LOGLEVEL", "INFO").strip('"').upper())
 
 
 @bp_add_url_embeddings.route(route="AddURLEmbeddings")

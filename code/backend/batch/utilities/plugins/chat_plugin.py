@@ -1,4 +1,3 @@
-import os
 from typing import Annotated
 
 from semantic_kernel.functions import kernel_function
@@ -6,11 +5,7 @@ from semantic_kernel.functions import kernel_function
 from ..common.answer import Answer
 from ..tools.question_answer_tool import QuestionAnswerTool
 from ..tools.text_processing_tool import TextProcessingTool
-
-
-def _is_database_enabled() -> bool:
-    """Check if Database integration is enabled via USE_REDSHIFT env var."""
-    return os.getenv("USE_REDSHIFT", "false").lower() == "true"
+from ..helpers.database.data_source_factory import is_database_enabled
 
 
 class ChatPlugin:
@@ -19,7 +14,7 @@ class ChatPlugin:
     1. search_documents - RAG for uploaded docs
     2. text_processing - Text transformations
 
-    When USE_REDSHIFT=true, use DatabaseChatPlugin which adds:
+    When database is configured, use DatabaseChatPlugin which adds:
     3. query_database - All database queries (LLM-generated SQL)
     4. analyze_database - Multi-step analysis
     """
@@ -62,8 +57,8 @@ class ChatPlugin:
 
 class DatabaseChatPlugin(ChatPlugin):
     """
-    Extended ChatPlugin with Database database integration.
-    Only used when USE_REDSHIFT=true.
+    Extended ChatPlugin with database integration.
+    Only used when a database (Snowflake or PostgreSQL) is configured.
 
     Adds:
     - query_database - Natural language SQL queries
@@ -167,8 +162,8 @@ def get_chat_plugin(question: str, chat_history: list[dict]) -> ChatPlugin:
     """
     Factory function to get the appropriate ChatPlugin.
 
-    Returns DatabaseChatPlugin when USE_REDSHIFT=true, otherwise base ChatPlugin.
+    Returns DatabaseChatPlugin when a database is configured, otherwise base ChatPlugin.
     """
-    if _is_database_enabled():
+    if is_database_enabled():
         return DatabaseChatPlugin(question, chat_history)
     return ChatPlugin(question, chat_history)

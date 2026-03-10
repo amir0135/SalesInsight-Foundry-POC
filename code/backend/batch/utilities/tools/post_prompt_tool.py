@@ -13,7 +13,7 @@ class PostPromptTool:
 
         sources = "\n".join(
             [
-                f"[doc{i+1}]: {source.content}"
+                f"[doc{i + 1}]: {source.content}"
                 for i, source in enumerate(answer.source_documents)
             ]
         )

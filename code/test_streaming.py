@@ -3,7 +3,6 @@ import asyncio
 import sys
 import time
 
-from backend.batch.utilities.helpers.env_helper import EnvHelper
 from backend.batch.utilities.helpers.llm_helper import LLMHelper
 from backend.batch.utilities.orchestrator.semantic_kernel import SemanticKernelOrchestrator
 
@@ -54,7 +53,7 @@ async def test_prepare_streaming():
                     sys.stdout.flush()
 
             total_time = time.perf_counter() - start
-            print(f"\n\n--- Done ---")
+            print("\n\n--- Done ---")
             print(f"Total tokens: {token_count}")
             print(f"Total time: {total_time:.2f}s")
             print(f"Time to first token: {first_token_time:.2f}s")

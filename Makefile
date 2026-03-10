@@ -15,7 +15,11 @@ ifeq ($(filter $(MAKECMDGOALS),config clean),)
 	endif
 endif
 
-include $(AZURE_ENV_FILE)
+ifneq ($(strip $(AZURE_ENV_FILE)),)
+	ifneq ($(strip $(wildcard $(AZURE_ENV_FILE))),)
+		include $(AZURE_ENV_FILE)
+	endif
+endif
 
 help: ## 💬 This help message :)
 	@grep -E '[a-zA-Z_-]+:.*?## .*$$' $(firstword $(MAKEFILE_LIST)) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-23s\033[0m %s\n", $$1, $$2}'

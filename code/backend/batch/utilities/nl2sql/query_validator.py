@@ -399,7 +399,7 @@ class QueryValidator:
             if re.search(pattern, sql, re.IGNORECASE):
                 result.is_valid = False
                 result.errors.append(
-                    f"Potential SQL injection pattern detected"
+                    "Potential SQL injection pattern detected"
                 )
                 raise SecurityViolationError(
                     "SQL injection pattern detected in query"
@@ -486,16 +486,16 @@ class QueryValidator:
 
     def _get_column_name(self, token) -> Optional[str]:
         """Extract the actual column name from an identifier, handling aliases.
-        
+
         Examples:
             'StyleNumber' -> 'StyleNumber'
-            'StyleNumber AS style' -> 'StyleNumber'  
+            'StyleNumber AS style' -> 'StyleNumber'
             'SUM(qty) AS total' -> None (function, skip)
             'table.column' -> 'column'
         """
         if isinstance(token, sqlparse.sql.Identifier):
             token_str = str(token)
-            
+
             # Skip function calls like SUM(col), COUNT(*), etc.
             if "(" in token_str:
                 return None
@@ -503,10 +503,10 @@ class QueryValidator:
             # get_real_name() returns the actual column, not the alias
             # e.g., for "StyleNumber AS style" it returns "StyleNumber"
             name = token.get_real_name()
-            
+
             if not name:
                 return None
-                
+
             # Skip if it's a known function name
             if name.upper() in self.config.allowed_functions:
                 return None
@@ -514,9 +514,9 @@ class QueryValidator:
             # Handle table.column notation - extract just the column
             if "." in name:
                 name = name.split(".")[-1]
-            
+
             return name.strip()
-            
+
         return None
 
     def _sanitize_sql(self, sql: str) -> str:

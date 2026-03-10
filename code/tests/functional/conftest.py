@@ -20,7 +20,7 @@ def setup_default_mocking(httpserver: HTTPServer, app_config: AppConfig):
     ).respond_with_data()
 
     httpserver.expect_request(
-        f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_EMBEDDING_MODEL_INFO','model')}/embeddings",
+        f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_EMBEDDING_MODEL_INFO', 'model')}/embeddings",
         method="POST",
     ).respond_with_json(
         {
@@ -58,7 +58,7 @@ def setup_default_mocking(httpserver: HTTPServer, app_config: AppConfig):
 
     httpserver.expect_request(
         re.compile(
-            f"/openai/deployments/({app_config.get_from_json('AZURE_OPENAI_MODEL_INFO','model')}|{app_config.get('AZURE_OPENAI_VISION_MODEL')})/chat/completions"
+            f"/openai/deployments/({app_config.get_from_json('AZURE_OPENAI_MODEL_INFO', 'model')}|{app_config.get('AZURE_OPENAI_VISION_MODEL')})/chat/completions"
         ),
         method="POST",
     ).respond_with_json(
@@ -194,7 +194,7 @@ def setup_default_mocking(httpserver: HTTPServer, app_config: AppConfig):
                     "inputs": [{"name": "text", "source": "/document/pages/*"}],
                     "outputs": [{"name": "embedding", "targetName": "content_vector"}],
                     "resourceUri": f"https://localhost:{httpserver.port}/",
-                    "deploymentId": f"{app_config.get_from_json('AZURE_OPENAI_EMBEDDING_MODEL_INFO','model')}",
+                    "deploymentId": f"{app_config.get_from_json('AZURE_OPENAI_EMBEDDING_MODEL_INFO', 'model')}",
                     "apiKey": f"{app_config.get('AZURE_OPENAI_API_KEY')}",
                 },
             ],
@@ -370,6 +370,6 @@ def setup_config_mocking(httpserver: HTTPServer):
         config_json_string,
         headers={
             "Content-Type": "application/json",
-            "Content-Range": f"bytes 0-{len(config_json_string.encode('utf-8'))-1}/{len(config_json_string.encode('utf-8'))}",
+            "Content-Range": f"bytes 0-{len(config_json_string.encode('utf-8')) - 1}/{len(config_json_string.encode('utf-8'))}",
         },
     )

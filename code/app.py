@@ -10,7 +10,7 @@ from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 logging.captureWarnings(True)
 
 # Logging configuration from environment variables
-AZURE_BASIC_LOGGING_LEVEL = os.environ.get("LOGLEVEL", "INFO")
+AZURE_BASIC_LOGGING_LEVEL = os.environ.get("LOGLEVEL", "INFO").strip('"')
 PACKAGE_LOGGING_LEVEL = os.environ.get("PACKAGE_LOGGING_LEVEL", "WARNING")
 AZURE_LOGGING_PACKAGES = os.environ.get("AZURE_LOGGING_PACKAGES", "")
 AZURE_LOGGING_PACKAGES = [pkg.strip() for pkg in AZURE_LOGGING_PACKAGES if pkg.strip()]

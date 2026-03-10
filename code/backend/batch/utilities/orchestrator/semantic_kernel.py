@@ -1,6 +1,5 @@
 import json
 import logging
-import os
 
 from semantic_kernel import Kernel
 from semantic_kernel.connectors.ai.function_choice_behavior import (
@@ -13,6 +12,7 @@ from semantic_kernel.contents.utils.finish_reason import FinishReason
 from ..common.answer import Answer
 from ..helpers.llm_helper import LLMHelper
 from ..helpers.env_helper import EnvHelper
+from ..helpers.database.data_source_factory import is_database_enabled
 from ..plugins.chat_plugin import get_chat_plugin
 from ..plugins.post_answering_plugin import PostAnsweringPlugin
 from ..search.search import Search
@@ -36,6 +36,57 @@ class SemanticKernelOrchestrator(OrchestratorBase):
         self.kernel.add_plugin(
             plugin=PostAnsweringPlugin(), plugin_name="PostAnswering"
         )
+
+    def _get_system_message(self) -> str:
+        """Get system message for orchestration, with clarification support."""
+        system_message = self.env_helper.SEMANTIC_KERNEL_SYSTEM_PROMPT
+        if system_message:
+            return system_message
+
+        if is_database_enabled():
+            return """You help employees navigate information from documents AND operational databases.
+
+TOOL SELECTION - Choose the RIGHT tool for each question:
+
+1. **query_database** - ALWAYS use for database questions about:
+   - Errors, error counts, error messages, error_logs
+   - Disconnections, connections, connectivity_logs
+   - Facilities, bays, radar devices
+   - Questions with: "how many", "count", "total", "top N", "which has most", "list", "show"
+   - Time-based queries: "last week", "past 30 days", "yesterday"
+
+2. **search_documents** - Use for document/policy questions:
+   - Contract terms, policies, procedures
+   - Documentation content, specifications
+
+3. **text_processing** - Use for transformations:
+   - Translate, summarize, paraphrase text
+
+IMPORTANT: For ANY question about errors, disconnections, facilities, or operational metrics, use query_database.
+When directly replying to the user, always reply in the language the user is speaking.
+
+CLARIFICATION - Ask follow-up questions when:
+- The query is ambiguous or could mean multiple things (e.g. "What is the menu?" has no clear data mapping)
+- Key terms don't match any known data domain (documents, database tables, etc.)
+- The user combines unrelated questions in one message - address what you can, then ask about the unclear part
+- A term could refer to different metrics (e.g. "performance" could mean revenue, order count, or delivery speed)
+When clarifying, briefly explain what data IS available and ask the user to be more specific.
+Do NOT guess or fabricate data. If uncertain, ask.
+"""
+        else:
+            return """You help employees to navigate only private information sources.
+You must prioritize the function call over your general knowledge for any question by calling the search_documents function.
+Call the text_processing function when the user request an operation on the current context, such as translate, summarize, or paraphrase. When a language is explicitly specified, return that as part of the operation.
+When directly replying to the user, always reply in the language the user is speaking.
+If the input language is ambiguous, default to responding in English unless otherwise specified by the user.
+Do not list all documents in the repository.
+
+CLARIFICATION - If the user's question is vague or ambiguous:
+- Ask a brief clarifying question to understand what they need
+- Mention what types of information are available (uploaded documents, policies, contracts, etc.)
+- If only part of the question is unclear, answer what you can and ask about the rest
+Do NOT guess or fabricate information. If uncertain, ask.
+"""
 
     async def orchestrate(
         self, user_message: str, chat_history: list[dict], **kwargs: dict
@@ -62,41 +113,7 @@ class SemanticKernelOrchestrator(OrchestratorBase):
 
         step_start = timing_module.perf_counter()
 
-        system_message = self.env_helper.SEMANTIC_KERNEL_SYSTEM_PROMPT
-        if not system_message:
-            # Check if Database/database integration is enabled
-            use_redshift = os.getenv("USE_REDSHIFT", "false").lower() == "true"
-
-            if use_redshift:
-                system_message = """You help employees navigate information from documents AND operational databases.
-
-TOOL SELECTION - Choose the RIGHT tool for each question:
-
-1. **query_database** - ALWAYS use for database questions about:
-   - Errors, error counts, error messages, error_logs
-   - Disconnections, connections, connectivity_logs
-   - Facilities, bays, radar devices
-   - Questions with: "how many", "count", "total", "top N", "which has most", "list", "show"
-   - Time-based queries: "last week", "past 30 days", "yesterday"
-
-2. **search_documents** - Use for document/policy questions:
-   - Contract terms, policies, procedures
-   - Documentation content, specifications
-
-3. **text_processing** - Use for transformations:
-   - Translate, summarize, paraphrase text
-
-IMPORTANT: For ANY question about errors, disconnections, facilities, or operational metrics, use query_database.
-When directly replying to the user, always reply in the language the user is speaking.
-"""
-            else:
-                system_message = """You help employees to navigate only private information sources.
-You must prioritize the function call over your general knowledge for any question by calling the search_documents function.
-Call the text_processing function when the user request an operation on the current context, such as translate, summarize, or paraphrase. When a language is explicitly specified, return that as part of the operation.
-When directly replying to the user, always reply in the language the user is speaking.
-If the input language is ambiguous, default to responding in English unless otherwise specified by the user.
-Do not list all documents in the repository.
-"""
+        system_message = self._get_system_message()
 
         self.kernel.add_plugin(
             plugin=get_chat_plugin(question=user_message, chat_history=chat_history),
@@ -242,39 +259,7 @@ Do not list all documents in the repository.
                 return {"streaming": False, "messages": response}
 
         # --- Tool selection (fast model, non-streaming) ---
-        system_message = self.env_helper.SEMANTIC_KERNEL_SYSTEM_PROMPT
-        if not system_message:
-            use_redshift = os.getenv("USE_REDSHIFT", "false").lower() == "true"
-            if use_redshift:
-                system_message = """You help employees navigate information from documents AND operational databases.
-
-TOOL SELECTION - Choose the RIGHT tool for each question:
-
-1. **query_database** - ALWAYS use for database questions about:
-   - Errors, error counts, error messages, error_logs
-   - Disconnections, connections, connectivity_logs
-   - Facilities, bays, radar devices
-   - Questions with: "how many", "count", "total", "top N", "which has most", "list", "show"
-   - Time-based queries: "last week", "past 30 days", "yesterday"
-
-2. **search_documents** - Use for document/policy questions:
-   - Contract terms, policies, procedures
-   - Documentation content, specifications
-
-3. **text_processing** - Use for transformations:
-   - Translate, summarize, paraphrase text
-
-IMPORTANT: For ANY question about errors, disconnections, facilities, or operational metrics, use query_database.
-When directly replying to the user, always reply in the language the user is speaking.
-"""
-            else:
-                system_message = """You help employees to navigate only private information sources.
-You must prioritize the function call over your general knowledge for any question by calling the search_documents function.
-Call the text_processing function when the user request an operation on the current context, such as translate, summarize, or paraphrase. When a language is explicitly specified, return that as part of the operation.
-When directly replying to the user, always reply in the language the user is speaking.
-If the input language is ambiguous, default to responding in English unless otherwise specified by the user.
-Do not list all documents in the repository.
-"""
+        system_message = self._get_system_message()
 
         self.kernel.add_plugin(
             plugin=get_chat_plugin(question=user_message, chat_history=chat_history),
@@ -390,12 +375,10 @@ Do not list all documents in the repository.
 
         try:
             # Check if Database is enabled
-            import os
-
-            if os.getenv("USE_REDSHIFT", "false").lower() != "true":
+            if not is_database_enabled():
                 answer = Answer(
                     question=user_message,
-                    answer="Database queries are not enabled. Set USE_REDSHIFT=true to enable Database database integration.",
+                    answer="Database queries are not enabled. Configure a database connection (Snowflake or PostgreSQL) to enable database integration.",
                     source_documents=[],
                 )
             else:

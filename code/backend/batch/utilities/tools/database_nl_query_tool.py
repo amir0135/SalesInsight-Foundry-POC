@@ -15,7 +15,7 @@ from typing import Dict, Optional
 from ..common.answer import Answer
 from ..helpers.llm_helper import LLMHelper
 from ..helpers.database.data_source_factory import get_data_source
-from ..helpers.database.redshift_config import (
+from ..helpers.database.database_config import (
     get_schema_for_prompt,
     get_sql_generation_prompt,
     validate_generated_sql,
@@ -222,6 +222,19 @@ class DatabaseNLQueryTool:
 
             logger.info(f"Generated SQL: {generated_sql}")
 
+            # Check if the LLM is asking for clarification instead of SQL
+            if generated_sql.upper().startswith("CLARIFY:"):
+                clarification_msg = generated_sql[len("CLARIFY:"):].strip()
+                logger.info("SQL generator requested clarification: %s", clarification_msg)
+                return {
+                    "sql": "",
+                    "success": True,
+                    "clarification": clarification_msg,
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "cached": False,
+                }
+
             # Cache the generated SQL in both caches for future use
             if self._use_semantic_cache:
                 self.semantic_cache.set(question, generated_sql)
@@ -297,6 +310,17 @@ class DatabaseNLQueryTool:
                 return Answer(
                     question=question,
                     answer=f"Failed to generate SQL query: {sql_result.get('error', 'Unknown error')}",
+                    source_documents=[],
+                    prompt_tokens=sql_result.get("prompt_tokens", 0),
+                    completion_tokens=sql_result.get("completion_tokens", 0),
+                )
+
+            # Step 1b: Handle clarification requests from SQL generator
+            if sql_result.get("clarification"):
+                logger.info("Returning clarification to user")
+                return Answer(
+                    question=question,
+                    answer=sql_result["clarification"],
                     source_documents=[],
                     prompt_tokens=sql_result.get("prompt_tokens", 0),
                     completion_tokens=sql_result.get("completion_tokens", 0),

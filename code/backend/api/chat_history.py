@@ -14,7 +14,7 @@ from backend.batch.utilities.chat_history.database_factory import DatabaseFactor
 load_dotenv()
 bp_chat_history_response = Blueprint("chat_history", __name__)
 logger = logging.getLogger(__name__)
-logger.setLevel(level=os.environ.get("LOGLEVEL", "INFO").upper())
+logger.setLevel(level=os.environ.get("LOGLEVEL", "INFO").strip('"').upper())
 
 env_helper: EnvHelper = EnvHelper()
 

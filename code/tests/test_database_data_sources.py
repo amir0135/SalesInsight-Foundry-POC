@@ -14,12 +14,12 @@ try:
 except ImportError:
     HAS_OPENPYXL = False
 
-from backend.batch.utilities.helpers.database.redshift_config import (
+from backend.batch.utilities.helpers.database.database_config import (
     validate_columns,
     validate_table,
 )
-from backend.batch.utilities.helpers.database.redshift_data_source import (
-    RedshiftDataSource,
+from backend.batch.utilities.helpers.database.postgres_data_source import (
+    PostgresDataSource,
 )
 from backend.batch.utilities.helpers.database.data_source_factory import (
     get_data_source,
@@ -193,8 +193,8 @@ class TestExcelDataSource:
         assert "avg_quality_score" in result["columns"]
 
 
-class TestRedshiftConfig:
-    """Tests for Redshift configuration and allowlists."""
+class TestDatabaseConfig:
+    """Tests for database configuration and allowlists."""
 
     def test_validate_table_allowed(self):
         """Test validating allowed table."""
@@ -220,8 +220,8 @@ class TestRedshiftConfig:
         )
 
 
-class TestRedshiftDataSource:
-    """Tests for Redshift data source."""
+class TestPostgresDataSource:
+    """Tests for PostgreSQL data source."""
 
     @patch("psycopg2.connect")
     def test_initialization_success(self, mock_connect):
@@ -229,25 +229,25 @@ class TestRedshiftDataSource:
         with patch.dict(
             os.environ,
             {
-                "REDSHIFT_HOST": "test.redshift.amazonaws.com",
-                "REDSHIFT_DB": "testdb",
-                "REDSHIFT_USER": "testuser",
-                "REDSHIFT_PASSWORD": "testpass",
+                "POSTGRES_HOST": "test.postgres.example.com",
+                "POSTGRES_DB": "testdb",
+                "POSTGRES_USER": "testuser",
+                "POSTGRES_PASSWORD": "testpass",
             },
         ):
-            ds = RedshiftDataSource()
-            assert ds.host == "test.redshift.amazonaws.com"
+            ds = PostgresDataSource()
+            assert ds.host == "test.postgres.example.com"
             assert ds.database == "testdb"
 
     def test_initialization_failure(self):
         """Test initialization failure with missing env vars."""
         with patch.dict(os.environ, {}, clear=True):
-            with pytest.raises(ValueError, match="Missing required Redshift"):
-                RedshiftDataSource()
+            with pytest.raises(ValueError, match="Missing required"):
+                PostgresDataSource()
 
     @patch("psycopg2.connect")
     def test_connection_setup(self, mock_connect):
-        """Test that RedshiftDataSource initializes correctly."""
+        """Test that PostgresDataSource initializes correctly."""
         # Setup mock
         mock_conn = MagicMock()
         mock_connect.return_value = mock_conn
@@ -255,15 +255,15 @@ class TestRedshiftDataSource:
         with patch.dict(
             os.environ,
             {
-                "REDSHIFT_HOST": "test.redshift.amazonaws.com",
-                "REDSHIFT_DB": "testdb",
-                "REDSHIFT_USER": "testuser",
-                "REDSHIFT_PASSWORD": "testpass",
+                "POSTGRES_HOST": "test.postgres.example.com",
+                "POSTGRES_DB": "testdb",
+                "POSTGRES_USER": "testuser",
+                "POSTGRES_PASSWORD": "testpass",
             },
         ):
-            ds = RedshiftDataSource()
+            ds = PostgresDataSource()
             # Verify connection was established
-            assert ds.host == "test.redshift.amazonaws.com"
+            assert ds.host == "test.postgres.example.com"
             assert ds.database == "testdb"
             assert ds.user == "testuser"
 
@@ -273,13 +273,13 @@ class TestRedshiftDataSource:
         with patch.dict(
             os.environ,
             {
-                "REDSHIFT_HOST": "test.redshift.amazonaws.com",
-                "REDSHIFT_DB": "testdb",
-                "REDSHIFT_USER": "testuser",
-                "REDSHIFT_PASSWORD": "testpass",
+                "POSTGRES_HOST": "test.postgres.example.com",
+                "POSTGRES_DB": "testdb",
+                "POSTGRES_USER": "testuser",
+                "POSTGRES_PASSWORD": "testpass",
             },
         ):
-            ds = RedshiftDataSource()
+            ds = PostgresDataSource()
 
             # Should succeed for allowed table
             assert ds._validate_table_access("orderhistoryline") is None
@@ -305,27 +305,26 @@ class TestDataSourceFactory:
             ds = get_data_source()
             assert isinstance(ds, ExcelDataSource)
 
-    def test_get_redshift_data_source_with_config(self):
-        """Test getting Redshift data source with proper config."""
+    def test_get_postgres_data_source_with_config(self):
+        """Test getting PostgreSQL data source with proper config."""
         with patch.dict(
             os.environ,
             {
-                "USE_REDSHIFT": "true",
-                "REDSHIFT_HOST": "test.redshift.amazonaws.com",
-                "REDSHIFT_DB": "testdb",
-                "REDSHIFT_USER": "testuser",
-                "REDSHIFT_PASSWORD": "testpass",
+                "POSTGRES_HOST": "test.postgres.example.com",
+                "POSTGRES_DB": "testdb",
+                "POSTGRES_USER": "testuser",
+                "POSTGRES_PASSWORD": "testpass",
             },
         ):
             ds = get_data_source()
-            assert isinstance(ds, RedshiftDataSource)
+            assert isinstance(ds, PostgresDataSource)
 
     def test_fallback_to_excel_on_missing_vars(self, sample_excel_data):
-        """Test fallback to Excel when Redshift vars missing."""
+        """Test fallback to Excel when PostgreSQL vars missing."""
         from backend.batch.utilities.helpers.database.excel_data_source import ExcelDataSource
         with patch.dict(
             os.environ,
-            {"USE_REDSHIFT": "true", "DATABASE_EXCEL_PATH": sample_excel_data},
+            {"DATABASE_EXCEL_PATH": sample_excel_data},
             clear=True,
         ):
             ds = get_data_source()

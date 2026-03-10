@@ -15,7 +15,7 @@ The Database integration provides access to operational data including:
 The integration uses a data source abstraction with two implementations:
 
 1. **ExcelDataSource** (default): Reads from a local Excel file for development/demo
-2. **RedshiftDataSource**: Connects to Amazon Redshift for production data
+2. **PostgresDataSource**: Connects to PostgreSQL for production data
 
 ## Data Source Configuration
 
@@ -48,18 +48,17 @@ data/testtrack/
 
 All error data from facility_a and facility_b will be merged, along with metadata and connectivity from the other files.
 
-### Redshift Mode
+### PostgreSQL Mode
 
-To enable Redshift integration, set the following environment variables:
+To enable PostgreSQL integration, set the following environment variables:
 
 ```bash
-USE_REDSHIFT=true
-REDSHIFT_HOST=your-cluster.region.redshift.amazonaws.com
-REDSHIFT_PORT=5439
-REDSHIFT_DB=your_database
-REDSHIFT_USER=your_username
-REDSHIFT_PASSWORD=your_password
-REDSHIFT_SCHEMA=public  # optional, defaults to public
+POSTGRES_HOST=your-server.postgres.database.azure.com
+POSTGRES_PORT=5432
+POSTGRES_DB=your_database
+POSTGRES_USER=your_username
+POSTGRES_PASSWORD=your_password
+POSTGRES_SCHEMA=public  # optional, defaults to public
 ```
 
 ## Excel File Format
@@ -101,12 +100,12 @@ The Excel file must contain these sheets with the specified columns:
 
 ## Security Features
 
-### Redshift Security
+### Database Security
 
-The Redshift integration includes multiple security layers:
+The PostgreSQL integration includes multiple security layers:
 
 1. **Parameterized Queries**: All queries use parameterized SQL to prevent SQL injection
-2. **Table Allowlist**: Only predefined tables can be queried (configured in `redshift_config.py`)
+2. **Table Allowlist**: Only predefined tables can be queried (configured in `database_config.py`)
 3. **Column Allowlist**: Only approved columns can be accessed per table
 4. **No Dynamic SQL**: User input never directly constructs SQL queries
 
@@ -114,7 +113,7 @@ The Redshift integration includes multiple security layers:
 
 The allowlist configuration is in:
 ```
-code/backend/batch/utilities/helpers/database/redshift_config.py
+code/backend/batch/utilities/helpers/database/database_config.py
 ```
 
 To add new tables or columns, edit the `ALLOWED_TABLES` dictionary in this file.
@@ -163,7 +162,7 @@ All queries return data in a consistent JSON format:
   "columns": ["col1", "col2", ...],
   "rows": [[val1, val2, ...], ...],
   "metadata": {
-    "source": "excel" or "redshift",
+    "source": "excel" or "postgres",
     "range_days": 30,
     "rowCount": 10,
     "facility_id": "FAC001"  // if filtered
@@ -183,7 +182,7 @@ poetry run pytest code/tests/test_database_data_sources.py -v
 
 Tests cover:
 - Excel data source functionality
-- Redshift parameterized query verification
+- PostgreSQL parameterized query verification
 - Table/column allowlist enforcement
 - Data source factory selection logic
 
@@ -191,7 +190,7 @@ Tests cover:
 
 1. **Start with Excel**: Use the Excel fallback for development and testing
 2. **Test locally**: Verify queries work with sample data
-3. **Switch to Redshift**: Set environment variables to connect to actual database
+3. **Switch to PostgreSQL**: Set environment variables to connect to actual database
 4. **Validate**: Ensure queries return expected results
 5. **Monitor**: Check logs for data source initialization and query execution
 
@@ -203,17 +202,17 @@ Error: No such file or directory: 'data/database_test_data.xlsx'
 ```
 **Solution**: Place your Excel file in the data directory or set `DATABASE_EXCEL_PATH`
 
-### Redshift connection failed
+### PostgreSQL connection failed
 ```
-Error: Missing required Redshift environment variables
+Error: Missing required PostgreSQL environment variables
 ```
-**Solution**: Verify all `REDSHIFT_*` variables are set and `USE_REDSHIFT=true`
+**Solution**: Verify all `POSTGRES_*` variables are set
 
 ### Table not in allowlist
 ```
 Error: Table 'xyz' is not in the allowlist
 ```
-**Solution**: Add the table to `ALLOWED_TABLES` in `redshift_config.py`
+**Solution**: Add the table to `ALLOWED_TABLES` in `database_config.py`
 
 ### Empty results
 - Check date range (default is 30 days)
@@ -225,7 +224,7 @@ Error: Table 'xyz' is not in the allowlist
 The system logs data source initialization and query execution:
 
 ```
-INFO: Initializing Excel data source (USE_REDSHIFT not set to true)
+INFO: Initializing Excel data source (no PostgreSQL connection configured)
 INFO: Excel data source active
 INFO: Loaded sheet 'errors' with 150 rows
 ```
@@ -236,7 +235,7 @@ Check logs to verify which data source is active and troubleshoot issues.
 
 1. **Always use parameterized queries** - Never concatenate user input into SQL
 2. **Maintain the allowlist** - Keep approved tables/columns up to date
-3. **Test with Excel first** - Validate query logic before connecting to Redshift
+3. **Test with Excel first** - Validate query logic before connecting to PostgreSQL
 4. **Monitor query performance** - Log slow queries and optimize as needed
 5. **Keep data fresh** - Ensure Excel file is updated for demos/testing
 

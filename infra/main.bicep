@@ -151,28 +151,30 @@ param useAdvancedImageProcessing bool = false
 param advancedImageProcessingMaxImages int = 1
 
 // =============================================
-// Database/Redshift Integration Parameters
+// Snowflake Integration Parameters
 // =============================================
-@description('Optional. Whether to enable Database database integration for operational data queries.')
-param useRedshift bool = false
+@description('Optional. Snowflake account identifier (e.g. xy12345.us-east-1).')
+param snowflakeAccount string = ''
 
-@description('Optional. Redshift/PostgreSQL host for Database data.')
+@description('Optional. Snowflake username.')
 @secure()
-param redshiftHost string = ''
+param snowflakeUser string = ''
 
-@description('Optional. Redshift/PostgreSQL port for Database data.')
-param redshiftPort string = '5439'
-
-@description('Optional. Redshift/PostgreSQL database name for Database data.')
-param redshiftDatabase string = ''
-
-@description('Optional. Redshift/PostgreSQL user for Database data.')
+@description('Optional. Snowflake password.')
 @secure()
-param redshiftUser string = ''
+param snowflakePassword string = ''
 
-@description('Optional. Redshift/PostgreSQL password for Database data.')
-@secure()
-param redshiftPassword string = ''
+@description('Optional. Snowflake warehouse name.')
+param snowflakeWarehouse string = 'COMPUTE_WH'
+
+@description('Optional. Snowflake database name.')
+param snowflakeDatabase string = 'SALES_DB'
+
+@description('Optional. Snowflake schema name.')
+param snowflakeSchema string = 'ORDERS'
+
+@description('Optional. Snowflake role for access control.')
+param snowflakeRole string = ''
 
 @description('Optional. Azure OpenAI Vision Model Deployment Name.')
 param azureOpenAIVisionModel string = 'gpt-4.1'
@@ -1322,13 +1324,15 @@ module web 'modules/app/web.bicep' = {
         MANAGED_IDENTITY_RESOURCE_ID: managedIdentityModule.outputs.resourceId
         AZURE_CLIENT_ID: managedIdentityModule.outputs.clientId // Required so LangChain AzureSearch vector store authenticates with this user-assigned managed identity
         APP_ENV: appEnvironment
-        // Database/Redshift Integration
-        USE_REDSHIFT: useRedshift ? 'true' : 'false'
-        REDSHIFT_HOST: useRedshift ? redshiftHost : ''
-        REDSHIFT_PORT: useRedshift ? redshiftPort : ''
-        REDSHIFT_DB: useRedshift ? redshiftDatabase : ''
-        REDSHIFT_USER: useRedshift ? redshiftUser : ''
-        REDSHIFT_PASSWORD: useRedshift ? redshiftPassword : ''
+        // Snowflake Integration
+        SNOWFLAKE_ACCOUNT: snowflakeAccount
+        SNOWFLAKE_USER: snowflakeUser
+        SNOWFLAKE_PASSWORD: snowflakePassword
+        SNOWFLAKE_WAREHOUSE: snowflakeWarehouse
+        SNOWFLAKE_DATABASE: snowflakeDatabase
+        SNOWFLAKE_SCHEMA: snowflakeSchema
+        SNOWFLAKE_ROLE: snowflakeRole
+        SALESINSIGHT_USE_LOCAL_DATA: empty(snowflakeAccount) ? 'true' : 'false'
       },
       databaseType == 'CosmosDB'
         ? {
@@ -1430,13 +1434,15 @@ module adminweb 'modules/app/adminweb.bicep' = {
         MANAGED_IDENTITY_CLIENT_ID: managedIdentityModule.outputs.clientId
         MANAGED_IDENTITY_RESOURCE_ID: managedIdentityModule.outputs.resourceId
         APP_ENV: appEnvironment
-        // Database/Redshift Integration
-        USE_REDSHIFT: useRedshift ? 'true' : 'false'
-        REDSHIFT_HOST: useRedshift ? redshiftHost : ''
-        REDSHIFT_PORT: useRedshift ? redshiftPort : ''
-        REDSHIFT_DB: useRedshift ? redshiftDatabase : ''
-        REDSHIFT_USER: useRedshift ? redshiftUser : ''
-        REDSHIFT_PASSWORD: useRedshift ? redshiftPassword : ''
+        // Snowflake Integration
+        SNOWFLAKE_ACCOUNT: snowflakeAccount
+        SNOWFLAKE_USER: snowflakeUser
+        SNOWFLAKE_PASSWORD: snowflakePassword
+        SNOWFLAKE_WAREHOUSE: snowflakeWarehouse
+        SNOWFLAKE_DATABASE: snowflakeDatabase
+        SNOWFLAKE_SCHEMA: snowflakeSchema
+        SNOWFLAKE_ROLE: snowflakeRole
+        SALESINSIGHT_USE_LOCAL_DATA: empty(snowflakeAccount) ? 'true' : 'false'
       },
       databaseType == 'CosmosDB'
         ? {
@@ -1539,13 +1545,15 @@ module function 'modules/app/function.bicep' = {
         AZURE_CLIENT_ID: managedIdentityModule.outputs.clientId // Required so LangChain AzureSearch vector store authenticates with this user-assigned managed identity
         APP_ENV: appEnvironment
         BACKEND_URL: backendUrl
-        // Database/Redshift Integration
-        USE_REDSHIFT: useRedshift ? 'true' : 'false'
-        REDSHIFT_HOST: useRedshift ? redshiftHost : ''
-        REDSHIFT_PORT: useRedshift ? redshiftPort : ''
-        REDSHIFT_DB: useRedshift ? redshiftDatabase : ''
-        REDSHIFT_USER: useRedshift ? redshiftUser : ''
-        REDSHIFT_PASSWORD: useRedshift ? redshiftPassword : ''
+        // Snowflake Integration
+        SNOWFLAKE_ACCOUNT: snowflakeAccount
+        SNOWFLAKE_USER: snowflakeUser
+        SNOWFLAKE_PASSWORD: snowflakePassword
+        SNOWFLAKE_WAREHOUSE: snowflakeWarehouse
+        SNOWFLAKE_DATABASE: snowflakeDatabase
+        SNOWFLAKE_SCHEMA: snowflakeSchema
+        SNOWFLAKE_ROLE: snowflakeRole
+        SALESINSIGHT_USE_LOCAL_DATA: empty(snowflakeAccount) ? 'true' : 'false'
       },
       databaseType == 'CosmosDB'
         ? {

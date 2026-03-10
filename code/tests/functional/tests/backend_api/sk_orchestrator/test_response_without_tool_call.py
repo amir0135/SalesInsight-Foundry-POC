@@ -64,7 +64,7 @@ def test_post_makes_correct_call_to_openai_embeddings(
     verify_request_made(
         mock_httpserver=httpserver,
         request_matcher=RequestMatcher(
-            path=f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_EMBEDDING_MODEL_INFO','model')}/embeddings",
+            path=f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_EMBEDDING_MODEL_INFO', 'model')}/embeddings",
             method="POST",
             json={
                 "input": [
@@ -157,7 +157,7 @@ def test_post_makes_correct_call_to_openai_chat_completions(
     verify_request_made(
         mock_httpserver=httpserver,
         request_matcher=RequestMatcher(
-            path=f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO','model')}/chat/completions",
+            path=f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO', 'model')}/chat/completions",
             method="POST",
             json={
                 "messages": [

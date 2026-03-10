@@ -10,7 +10,7 @@ from utilities.helpers.config.config_helper import ConfigHelper
 
 bp_get_conversation_response = func.Blueprint()
 logger = logging.getLogger(__name__)
-logger.setLevel(level=os.environ.get("LOGLEVEL", "INFO").upper())
+logger.setLevel(level=os.environ.get("LOGLEVEL", "INFO").strip('"').upper())
 
 
 @bp_get_conversation_response.route(route="GetConversationResponse")

@@ -6,7 +6,6 @@ import functools
 import json
 import logging
 import mimetypes
-import os
 from os import path
 import sys
 import re
@@ -750,7 +749,8 @@ def create_app():
         Refresh the database schema configuration by introspecting the database.
         Uses AI to generate descriptions and keywords automatically.
         """
-        if os.getenv("USE_REDSHIFT", "false").lower() != "true":
+        from backend.batch.utilities.helpers.database.data_source_factory import is_database_enabled
+        if not is_database_enabled():
             return jsonify({"error": "Database integration not enabled"}), 400
 
         try:
@@ -773,7 +773,8 @@ def create_app():
     @app.route("/api/schema/info", methods=["GET"])
     def get_schema_info():
         """Get current schema configuration."""
-        if os.getenv("USE_REDSHIFT", "false").lower() != "true":
+        from backend.batch.utilities.helpers.database.data_source_factory import is_database_enabled
+        if not is_database_enabled():
             return jsonify({"error": "Database integration not enabled"}), 400
 
         try:

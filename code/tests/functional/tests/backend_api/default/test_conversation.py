@@ -28,7 +28,7 @@ body = {
 @pytest.fixture(autouse=True)
 def completions_mocking(httpserver: HTTPServer, app_config: AppConfig):
     httpserver.expect_oneshot_request(
-        f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO','model')}/chat/completions",
+        f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO', 'model')}/chat/completions",
         method="POST",
     ).respond_with_json(
         {
@@ -58,7 +58,7 @@ def completions_mocking(httpserver: HTTPServer, app_config: AppConfig):
     )
 
     httpserver.expect_oneshot_request(
-        f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO','model')}/chat/completions",
+        f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO', 'model')}/chat/completions",
         method="POST",
     ).respond_with_json(
         {
@@ -126,7 +126,7 @@ def test_post_makes_correct_calls_to_openai_embeddings_to_get_vector_dimensions(
     verify_request_made(
         mock_httpserver=httpserver,
         request_matcher=RequestMatcher(
-            path=f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_EMBEDDING_MODEL_INFO','model')}/embeddings",
+            path=f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_EMBEDDING_MODEL_INFO', 'model')}/embeddings",
             method="POST",
             json={
                 "input": [[1199]],
@@ -155,7 +155,7 @@ def test_post_makes_correct_calls_to_openai_embeddings_to_embed_question_to_sear
     verify_request_made(
         mock_httpserver=httpserver,
         request_matcher=RequestMatcher(
-            path=f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_EMBEDDING_MODEL_INFO','model')}/embeddings",
+            path=f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_EMBEDDING_MODEL_INFO', 'model')}/embeddings",
             method="POST",
             json={
                 "input": [
@@ -190,7 +190,7 @@ def test_post_makes_correct_calls_to_openai_embeddings_to_embed_question_to_stor
     verify_request_made(
         mock_httpserver=httpserver,
         request_matcher=RequestMatcher(
-            path=f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_EMBEDDING_MODEL_INFO','model')}/embeddings",
+            path=f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_EMBEDDING_MODEL_INFO', 'model')}/embeddings",
             method="POST",
             json={
                 "input": [
@@ -267,7 +267,7 @@ def test_post_makes_correct_call_to_openai_chat_completions_with_functions(
     verify_request_made(
         mock_httpserver=httpserver,
         request_matcher=RequestMatcher(
-            path=f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO','model')}/chat/completions",
+            path=f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO', 'model')}/chat/completions",
             method="POST",
             json={
                 "messages": [
@@ -557,7 +557,7 @@ def test_post_makes_correct_call_to_openai_chat_completions_with_documents(
     verify_request_made(
         mock_httpserver=httpserver,
         request_matcher=RequestMatcher(
-            path=f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO','model')}/chat/completions",
+            path=f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO', 'model')}/chat/completions",
             method="POST",
             json={
                 "messages": [

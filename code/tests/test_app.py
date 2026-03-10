@@ -257,7 +257,10 @@ class TestConversationCustom:
         )
 
         message_orchestrator_mock = AsyncMock()
-        message_orchestrator_mock.handle_message.return_value = self.messages
+        message_orchestrator_mock.prepare_streaming.return_value = {
+            "streaming": False,
+            "messages": self.messages,
+        }
         get_message_orchestrator_mock.return_value = message_orchestrator_mock
 
         env_helper_mock.AZURE_OPENAI_MODEL = self.openai_model
@@ -300,7 +303,10 @@ class TestConversationCustom:
         get_orchestrator_config_mock.return_value = self.orchestrator_config
 
         message_orchestrator_mock = AsyncMock()
-        message_orchestrator_mock.handle_message.return_value = self.messages
+        message_orchestrator_mock.prepare_streaming.return_value = {
+            "streaming": False,
+            "messages": self.messages,
+        }
         get_message_orchestrator_mock.return_value = message_orchestrator_mock
 
         env_helper_mock.AZURE_OPENAI_MODEL = self.openai_model
@@ -313,7 +319,7 @@ class TestConversationCustom:
         )
 
         # then
-        message_orchestrator_mock.handle_message.assert_called_once_with(
+        message_orchestrator_mock.prepare_streaming.assert_called_once_with(
             user_message=self.body["messages"][-1]["content"],
             chat_history=self.body["messages"][:-1],
             conversation_id=self.body["conversation_id"],
@@ -445,7 +451,10 @@ class TestConversationCustom:
         get_orchestrator_config_mock.return_value = self.orchestrator_config
 
         message_orchestrator_mock = AsyncMock()
-        message_orchestrator_mock.handle_message.return_value = self.messages
+        message_orchestrator_mock.prepare_streaming.return_value = {
+            "streaming": False,
+            "messages": self.messages,
+        }
         get_message_orchestrator_mock.return_value = message_orchestrator_mock
 
         body = {
@@ -470,7 +479,7 @@ class TestConversationCustom:
 
         # then
         assert response.status_code == 200
-        message_orchestrator_mock.handle_message.assert_called_once_with(
+        message_orchestrator_mock.prepare_streaming.assert_called_once_with(
             user_message=body["messages"][-1]["content"],
             chat_history=body["messages"][:-1],
             conversation_id=body["conversation_id"],

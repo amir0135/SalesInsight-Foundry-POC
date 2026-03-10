@@ -12,8 +12,8 @@ import streamlit as st
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from batch.utilities.helpers.env_helper import EnvHelper
-from batch.utilities.helpers.azure_blob_storage_client import AzureBlobStorageClient
+from batch.utilities.helpers.env_helper import EnvHelper  # noqa: E402
+from batch.utilities.helpers.azure_blob_storage_client import AzureBlobStorageClient  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +78,7 @@ def load_db_config() -> dict:
             return json.loads(blob_data)
     except Exception as e:
         logger.warning(f"Could not load database config from blob storage: {e}")
-    
+
     # Fallback to local file (development)
     try:
         if os.path.exists(LOCAL_CONFIG_PATH):
@@ -86,14 +86,14 @@ def load_db_config() -> dict:
                 return json.load(f)
     except Exception as e:
         logger.warning(f"Could not load local database config: {e}")
-    
+
     return DEFAULT_CONFIG.copy()
 
 
 def save_db_config(config: dict) -> bool:
     """Save database configuration to blob storage and local file."""
     success = False
-    
+
     # Try blob storage first (production)
     try:
         blob_client = AzureBlobStorageClient(container_name=DB_CONFIG_CONTAINER)
@@ -106,7 +106,7 @@ def save_db_config(config: dict) -> bool:
         logger.info("Saved database config to blob storage")
     except Exception as e:
         logger.warning(f"Could not save to blob storage: {e}")
-    
+
     # Also save locally (for development and backup)
     try:
         os.makedirs(os.path.dirname(LOCAL_CONFIG_PATH), exist_ok=True)
@@ -118,7 +118,7 @@ def save_db_config(config: dict) -> bool:
         logger.warning(f"Could not save config locally: {e}")
         if not success:
             st.error(f"Failed to save configuration: {e}")
-    
+
     return success
 
 
@@ -126,7 +126,7 @@ def test_snowflake_connection(config: dict) -> tuple[bool, str]:
     """Test Snowflake connection with provided credentials."""
     try:
         import snowflake.connector
-        
+
         conn = snowflake.connector.connect(
             account=config["account"],
             user=config["user"],
@@ -136,16 +136,16 @@ def test_snowflake_connection(config: dict) -> tuple[bool, str]:
             schema=config["schema"],
             role=config.get("role") or None,
         )
-        
+
         # Test query
         cursor = conn.cursor()
         cursor.execute("SELECT CURRENT_WAREHOUSE(), CURRENT_DATABASE(), CURRENT_SCHEMA()")
         result = cursor.fetchone()
         cursor.close()
         conn.close()
-        
+
         return True, f"✅ Connected! Warehouse: {result[0]}, Database: {result[1]}, Schema: {result[2]}"
-    
+
     except ImportError:
         return False, "❌ Snowflake connector not installed. Run: pip install snowflake-connector-python"
     except Exception as e:
@@ -156,7 +156,7 @@ def test_postgresql_connection(config: dict) -> tuple[bool, str]:
     """Test PostgreSQL connection with provided credentials."""
     try:
         import psycopg2
-        
+
         conn = psycopg2.connect(
             host=config["host"],
             port=config["port"],
@@ -164,15 +164,15 @@ def test_postgresql_connection(config: dict) -> tuple[bool, str]:
             user=config["user"],
             password=st.session_state.get("postgresql_password", ""),
         )
-        
+
         cursor = conn.cursor()
         cursor.execute("SELECT current_database(), current_schema()")
         result = cursor.fetchone()
         cursor.close()
         conn.close()
-        
+
         return True, f"✅ Connected! Database: {result[0]}, Schema: {result[1]}"
-    
+
     except ImportError:
         return False, "❌ psycopg2 not installed. Run: pip install psycopg2-binary"
     except Exception as e:
@@ -182,7 +182,7 @@ def test_postgresql_connection(config: dict) -> tuple[bool, str]:
 def discover_tables(data_source: str, config: dict) -> list[str]:
     """Discover available tables in the connected database."""
     tables = []
-    
+
     try:
         if data_source == "snowflake":
             import snowflake.connector
@@ -199,7 +199,7 @@ def discover_tables(data_source: str, config: dict) -> list[str]:
             tables = [row[1] for row in cursor.fetchall()]
             cursor.close()
             conn.close()
-            
+
         elif data_source == "postgresql":
             import psycopg2
             conn = psycopg2.connect(
@@ -211,16 +211,16 @@ def discover_tables(data_source: str, config: dict) -> list[str]:
             )
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT table_name FROM information_schema.tables 
+                SELECT table_name FROM information_schema.tables
                 WHERE table_schema = %s AND table_type = 'BASE TABLE'
             """, (config.get("schema", "public"),))
             tables = [row[0] for row in cursor.fetchall()]
             cursor.close()
             conn.close()
-            
+
     except Exception as e:
         st.error(f"Failed to discover tables: {e}")
-    
+
     return tables
 
 
@@ -233,7 +233,7 @@ config = st.session_state.db_config
 # Page header
 st.title("🗄️ Database Connection")
 st.markdown("""
-Configure your data source for SalesInsight analytics. 
+Configure your data source for SalesInsight analytics.
 You can use local CSV files for testing or connect to Snowflake/PostgreSQL for production.
 """)
 
@@ -260,24 +260,24 @@ st.markdown("---")
 # Configuration based on data source
 if data_source == "local":
     st.subheader("2️⃣ Upload CSV Data")
-    
+
     # Detect environment
     env_helper = EnvHelper()
     is_production = os.environ.get("WEBSITE_SITE_NAME") is not None  # Azure App Service sets this
-    
+
     st.markdown("### 📤 Upload CSV File")
-    
+
     if is_production:
         st.info("🌐 **Production Mode**: CSV will be uploaded to Azure Blob Storage")
     else:
         st.info("💻 **Local Mode**: CSV will be saved to the data/ folder")
-    
+
     uploaded_file = st.file_uploader(
         "Upload a CSV file to use as your data source",
         type=["csv"],
         help="Upload a CSV file with headers. Max recommended size: 50MB"
     )
-    
+
     if uploaded_file is not None:
         # Preview the uploaded file
         import pandas as pd
@@ -285,22 +285,22 @@ if data_source == "local":
             df = pd.read_csv(uploaded_file, nrows=5)
             st.write("**Preview (first 5 rows):**")
             st.dataframe(df)
-            
+
             # Show column info
             st.write(f"**Columns ({len(df.columns)}):** {', '.join(df.columns.tolist())}")
-            
+
             # Reset file position for saving
             uploaded_file.seek(0)
             file_size_mb = len(uploaded_file.getvalue()) / (1024 * 1024)
             st.write(f"**File size:** {file_size_mb:.1f} MB")
-            
+
             # Save button
             col1, col2 = st.columns([1, 3])
             with col1:
                 if st.button("💾 Upload & Save", type="primary"):
                     uploaded_file.seek(0)
                     file_bytes = uploaded_file.getvalue()
-                    
+
                     if is_production:
                         # Upload to Azure Blob Storage
                         try:
@@ -310,14 +310,14 @@ if data_source == "local":
                                 f"csv/{uploaded_file.name}",
                                 content_type="text/csv"
                             )
-                            st.success(f"✅ Uploaded to Azure Blob Storage!")
+                            st.success("✅ Uploaded to Azure Blob Storage!")
                             st.code(f"salesdata/csv/{uploaded_file.name}")
-                            
+
                             # Update config
                             config.setdefault("local", {})["blob_path"] = f"csv/{uploaded_file.name}"
                             config["local"]["uploaded_file"] = uploaded_file.name
                             save_db_config(config)
-                            
+
                             st.info("The app will use this CSV on next restart.")
                         except Exception as e:
                             st.error(f"Upload failed: {e}")
@@ -326,25 +326,25 @@ if data_source == "local":
                         # Save locally
                         data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data")
                         os.makedirs(data_dir, exist_ok=True)
-                        
+
                         file_path = os.path.join(data_dir, uploaded_file.name)
                         with open(file_path, "wb") as f:
                             f.write(file_bytes)
-                        
+
                         st.success(f"✅ Saved to `data/{uploaded_file.name}`")
-                        
+
                         # Update config
                         config.setdefault("local", {})["csv_path"] = file_path
                         config["local"]["uploaded_file"] = uploaded_file.name
-                        
+
                     st.info("⚠️ Restart the application to load the new data.")
-                    
+
         except Exception as e:
             st.error(f"Error reading CSV: {e}")
-    
+
     st.markdown("---")
     st.markdown("### 📁 Current Data Files")
-    
+
     if is_production:
         # Show files in blob storage
         try:
@@ -363,42 +363,42 @@ if data_source == "local":
                 for f in csv_files:
                     file_path = os.path.join(data_dir, f)
                     size_mb = os.path.getsize(file_path) / (1024 * 1024)
-                    
+
                     # Count rows
                     try:
                         import subprocess
                         result = subprocess.run(['wc', '-l', file_path], capture_output=True, text=True)
                         rows = int(result.stdout.split()[0])
-                    except:
+                    except Exception:
                         rows = "?"
-                    
+
                     st.write(f"- **{f}** ({size_mb:.1f} MB, {rows} rows)")
             else:
-            st.write("No CSV files found in data/ folder")
-    
+                st.write("No CSV files found in data/ folder")
+
     st.success("✅ Local mode is ready! CSV files in data/ folder are automatically loaded.")
-    
+
     st.info("""
     **Supported Formats:**
     - CSV files (.csv) - Comma-separated with headers
-    - Excel files (.xlsx, .xls) 
+    - Excel files (.xlsx, .xls)
     - The filename becomes the table name (cleaned up)
-    
+
     **Your CSV:** `db_more_weu_prod_dbo_OrderHistoryLine.csv` → table `orderhistoryline`
     """)
 
 elif data_source == "snowflake":
     st.subheader("2️⃣ Snowflake Configuration")
-    
+
     st.markdown("""
-    Enter your Snowflake connection details below. 
+    Enter your Snowflake connection details below.
     [📖 Snowflake Setup Guide](https://github.com/amir0135/SalesInsight-Foundry-POC/blob/main/docs/snowflake_setup.md)
     """)
-    
+
     sf_config = config.setdefault("snowflake", DEFAULT_CONFIG["snowflake"].copy())
-    
+
     col1, col2 = st.columns(2)
-    
+
     with col1:
         sf_config["account"] = st.text_input(
             "Account Identifier *",
@@ -406,21 +406,21 @@ elif data_source == "snowflake":
             placeholder="xy12345.us-east-1",
             help="Your Snowflake account identifier (e.g., xy12345.us-east-1)"
         )
-        
+
         sf_config["warehouse"] = st.text_input(
             "Warehouse *",
             value=sf_config.get("warehouse", ""),
             placeholder="COMPUTE_WH",
             help="Snowflake warehouse name"
         )
-        
+
         sf_config["database"] = st.text_input(
             "Database *",
             value=sf_config.get("database", ""),
             placeholder="SALES_DB",
             help="Snowflake database name"
         )
-    
+
     with col2:
         sf_config["schema"] = st.text_input(
             "Schema",
@@ -428,21 +428,21 @@ elif data_source == "snowflake":
             placeholder="PUBLIC",
             help="Snowflake schema (default: PUBLIC)"
         )
-        
+
         sf_config["user"] = st.text_input(
             "Username *",
             value=sf_config.get("user", ""),
             placeholder="salesinsight_user",
             help="Snowflake username"
         )
-        
+
         sf_config["role"] = st.text_input(
             "Role (optional)",
             value=sf_config.get("role", ""),
             placeholder="SALESINSIGHT_ROLE",
             help="Snowflake role for access control"
         )
-    
+
     # Password input (not saved to config file for security)
     st.text_input(
         "Password *",
@@ -450,9 +450,9 @@ elif data_source == "snowflake":
         key="snowflake_password",
         help="Password is used for testing only and NOT saved to configuration"
     )
-    
+
     st.warning("⚠️ **Security Note:** Password is only used for connection testing. In production, use Azure Key Vault.")
-    
+
     # Test connection button
     col1, col2, col3 = st.columns([1, 1, 2])
     with col1:
@@ -468,7 +468,7 @@ elif data_source == "snowflake":
                         st.success(message)
                     else:
                         st.error(message)
-    
+
     with col2:
         if st.button("📋 Discover Tables", key="discover_snowflake"):
             if st.session_state.get("snowflake_password"):
@@ -478,7 +478,7 @@ elif data_source == "snowflake":
                         st.session_state.discovered_tables = tables
                     else:
                         st.warning("No tables found or connection failed")
-    
+
     # Show discovered tables
     if st.session_state.get("discovered_tables"):
         st.markdown("**Available Tables:**")
@@ -487,11 +487,11 @@ elif data_source == "snowflake":
 
 elif data_source == "postgresql":
     st.subheader("2️⃣ PostgreSQL Configuration")
-    
+
     pg_config = config.setdefault("postgresql", DEFAULT_CONFIG["postgresql"].copy())
-    
+
     col1, col2 = st.columns(2)
-    
+
     with col1:
         pg_config["host"] = st.text_input(
             "Host *",
@@ -499,21 +499,21 @@ elif data_source == "postgresql":
             placeholder="your-server.postgres.database.azure.com",
             help="PostgreSQL server hostname"
         )
-        
+
         pg_config["port"] = st.text_input(
             "Port",
             value=pg_config.get("port", "5432"),
             placeholder="5432",
             help="PostgreSQL port (default: 5432)"
         )
-        
+
         pg_config["database"] = st.text_input(
             "Database *",
             value=pg_config.get("database", ""),
             placeholder="salesdb",
             help="PostgreSQL database name"
         )
-    
+
     with col2:
         pg_config["schema"] = st.text_input(
             "Schema",
@@ -521,21 +521,21 @@ elif data_source == "postgresql":
             placeholder="public",
             help="PostgreSQL schema (default: public)"
         )
-        
+
         pg_config["user"] = st.text_input(
             "Username *",
             value=pg_config.get("user", ""),
             placeholder="postgres",
             help="PostgreSQL username"
         )
-    
+
     st.text_input(
         "Password *",
         type="password",
         key="postgresql_password",
         help="Password is used for testing only and NOT saved"
     )
-    
+
     col1, col2, col3 = st.columns([1, 1, 2])
     with col1:
         if st.button("🔌 Test Connection", key="test_pg"):
@@ -550,7 +550,7 @@ elif data_source == "postgresql":
                         st.success(message)
                     else:
                         st.error(message)
-    
+
     with col2:
         if st.button("📋 Discover Tables", key="discover_pg"):
             if st.session_state.get("postgresql_password"):
@@ -600,17 +600,17 @@ with st.expander("How do I get my Snowflake account identifier?"):
     Your Snowflake account identifier is shown in your Snowflake URL:
     - `https://xy12345.us-east-1.snowflakecomputing.com` → Account: `xy12345.us-east-1`
     - `https://myorg-myaccount.snowflakecomputing.com` → Account: `myorg-myaccount`
-    
+
     You can also find it in Snowflake:
     1. Click your name (bottom left)
-    2. Go to "Account" 
+    2. Go to "Account"
     3. Copy the "Account Identifier"
     """)
 
 with st.expander("How do I set up the ORDERHISTORYLINE table in Snowflake?"):
     st.markdown("""
     Run this SQL in Snowflake to create the table:
-    
+
     ```sql
     CREATE TABLE IF NOT EXISTS ORDERHISTORYLINE (
         Id VARCHAR(50) PRIMARY KEY,
@@ -639,7 +639,7 @@ with st.expander("How do I set up the ORDERHISTORYLINE table in Snowflake?"):
         Note TEXT
     );
     ```
-    
+
     Then load your CSV data using:
     ```sql
     COPY INTO ORDERHISTORYLINE
@@ -651,15 +651,15 @@ with st.expander("How do I set up the ORDERHISTORYLINE table in Snowflake?"):
 with st.expander("How do I securely store credentials in production?"):
     st.markdown("""
     **For production, use Azure Key Vault:**
-    
+
     1. Store your credentials in Key Vault:
     ```bash
     az keyvault secret set --vault-name your-keyvault \\
       --name SNOWFLAKE-PASSWORD --value "your-password"
     ```
-    
+
     2. The app will automatically fetch from Key Vault when `AZURE_AUTH_TYPE=rbac`
-    
+
     3. Grant the App Service identity access to Key Vault:
     ```bash
     az keyvault set-policy --name your-keyvault \\

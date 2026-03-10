@@ -47,7 +47,7 @@ User Question
                         ▼
                ┌────────────────┐
                │  Data Source   │
-               │  (Redshift/    │
+               │  (Snowflake/   │
                │   PostgreSQL)  │
                └────────────────┘
 ```
@@ -65,9 +65,9 @@ User Question
 
 | File | Changes |
 |------|---------|
-| [redshift_config.py](../code/backend/batch/utilities/helpers/database/redshift_config.py) | Added schema descriptions, SQL generation prompt, validation functions |
+| [database_config.py](../code/backend/batch/utilities/helpers/database/database_config.py) | Added schema descriptions, SQL generation prompt, validation functions |
 | [data_source_interface.py](../code/backend/batch/utilities/helpers/database/data_source_interface.py) | Added abstract `execute_custom_query()` method |
-| [redshift_data_source.py](../code/backend/batch/utilities/helpers/database/redshift_data_source.py) | Implemented `execute_custom_query()` method |
+| [postgres_data_source.py](../code/backend/batch/utilities/helpers/database/postgres_data_source.py) | Implemented `execute_custom_query()` method |
 | [excel_data_source.py](../code/backend/batch/utilities/helpers/database/excel_data_source.py) | Added stub for `execute_custom_query()` (raises NotImplementedError) |
 | [chat_plugin.py](../code/backend/batch/utilities/plugins/chat_plugin.py) | Added `query_database_flexible()` Semantic Kernel function |
 
@@ -139,7 +139,7 @@ User: "Which 5 facilities have the most disconnections this week?"
 ## Configuration
 
 ### Schema Description
-The `SCHEMA_DESCRIPTION` dictionary in `redshift_config.py` provides LLM-friendly documentation for each table:
+The `SCHEMA_DESCRIPTION` dictionary in `database_config.py` provides LLM-friendly documentation for each table:
 
 ```python
 SCHEMA_DESCRIPTION = {
@@ -321,11 +321,11 @@ We chose a dedicated analysis tool over `auto_invoke=True` because:
 
 ## Limitations
 
-1. **Excel Data Source**: The flexible query feature only works with Redshift/PostgreSQL. Excel data sources will raise `NotImplementedError`.
+1. **Excel Data Source**: The flexible query feature only works with Snowflake/PostgreSQL. Excel data sources will raise `NotImplementedError`.
 
 2. **Complex Queries**: Very complex analytical queries may not generate correctly. For these cases, consider adding new intent-based queries.
 
-3. **Schema Changes**: Any changes to the database schema must be reflected in `redshift_config.py` to remain queryable.
+3. **Schema Changes**: Any changes to the database schema must be reflected in `database_config.py` to remain queryable.
 
 ## Rollback
 

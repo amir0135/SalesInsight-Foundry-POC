@@ -72,10 +72,24 @@ def test_get_conversation_client_postgres(
     mock_postgres_instance = MagicMock(spec=PostgresConversationClient)
     mock_postgres_client.return_value = mock_postgres_instance
 
-    client = DatabaseFactory.get_conversation_client()
+    with patch.dict("os.environ", {}, clear=False):
+        # Remove override env var if present so it falls back to DATABASE_TYPE
+        import os
+        os.environ.pop("CHAT_HISTORY_DATABASE_TYPE", None)
+        os.environ.pop("CHAT_HISTORY_PG_USER", None)
+        os.environ.pop("CHAT_HISTORY_PG_HOST", None)
+        os.environ.pop("CHAT_HISTORY_PG_DATABASE", None)
+        os.environ.pop("CHAT_HISTORY_PG_PASSWORD", None)
+        os.environ.pop("CHAT_HISTORY_PG_PORT", None)
+
+        client = DatabaseFactory.get_conversation_client()
 
     mock_postgres_client.assert_called_once_with(
-        user="postgres_user", host="postgres_host", database="postgres_database"
+        user="postgres_user",
+        host="postgres_host",
+        database="postgres_database",
+        password=None,
+        port=5432,
     )
     assert isinstance(client, PostgresConversationClient)
 
@@ -85,5 +99,5 @@ def test_get_conversation_client_invalid_database_type(mock_env_helper):
     mock_env_instance = mock_env_helper.return_value
     mock_env_instance.DATABASE_TYPE = "INVALID_DB"
 
-    with pytest.raises(ValueError, match="Unsupported DATABASE_TYPE"):
+    with pytest.raises(ValueError, match="Unsupported database type"):
         DatabaseFactory.get_conversation_client()

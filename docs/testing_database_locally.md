@@ -1,6 +1,6 @@
-# Testing Redshift Integration Locally
+# Testing Database Integration Locally
 
-Since Amazon Redshift is based on PostgreSQL, you can test the integration locally using PostgreSQL.
+You can test the database integration locally using PostgreSQL.
 
 ## Option 1: Docker PostgreSQL (Easiest)
 
@@ -96,13 +96,12 @@ VALUES
 Update your `.env` file:
 
 ```bash
-USE_REDSHIFT=true
-REDSHIFT_HOST=localhost
-REDSHIFT_PORT=5432
-REDSHIFT_DB=database_test
-REDSHIFT_USER=testuser
-REDSHIFT_PASSWORD=testpassword
-REDSHIFT_SCHEMA=public
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=database_test
+POSTGRES_USER=testuser
+POSTGRES_PASSWORD=testpassword
+POSTGRES_SCHEMA=public
 ```
 
 ### 4. Test the Integration
@@ -150,11 +149,11 @@ psql -U testuser -d database_test
 
 ## Option 3: Run Unit Tests (No Database Required)
 
-We have unit tests that mock the Redshift connection:
+We have unit tests that mock the database connection:
 
 ```bash
-# Run Redshift integration tests
-poetry run pytest tests/test_database_redshift.py -v
+# Run database integration tests
+poetry run pytest tests/test_database_integration.py -v
 
 # Run all Database tests
 poetry run pytest tests/ -k database -v
@@ -166,15 +165,15 @@ These tests verify:
 - Query correctness
 - Error handling
 
-## Option 4: Use Excel Mode (Skip Redshift Testing)
+## Option 4: Use Excel Mode (Skip Database Testing)
 
-If you just want to test the feature end-to-end without Redshift:
+If you just want to test the feature end-to-end without PostgreSQL:
 
-1. Keep `USE_REDSHIFT=false` (or comment it out)
+1. Ensure no `POSTGRES_HOST` is configured
 2. Place Excel files in `data/testtrack/`
 3. Test the same queries - they'll work against Excel data
 
-The integration layer is identical for both data sources, so if it works with Excel, it will work with Redshift.
+The integration layer is identical for both data sources, so if it works with Excel, it will work with PostgreSQL.
 
 ## Verifying the Integration Works
 
@@ -182,8 +181,8 @@ The integration layer is identical for both data sources, so if it works with Ex
 
 When the app starts, you should see:
 ```
-INFO: Database data source initialized: RedshiftDataSource
-INFO: Connected to Redshift at localhost:5432/database_test
+INFO: Database data source initialized: PostgresDataSource
+INFO: Connected to PostgreSQL at localhost:5432/database_test
 ```
 
 Or with Excel:
@@ -224,7 +223,7 @@ print(result)
 
 ### Connection refused
 - Make sure PostgreSQL is running: `docker ps` or `brew services list`
-- Check the port is correct (5432 for PostgreSQL, 5439 for Redshift)
+- Check the port is correct (5432 for PostgreSQL)
 
 ### Authentication failed
 - Verify username/password in `.env` match database settings
@@ -233,7 +232,7 @@ print(result)
 ### Table not found
 - Ensure you ran all the CREATE TABLE statements
 - Check schema: tables should be in `public` schema
-- Verify allowlist in `redshift_config.py` includes your tables
+- Verify allowlist in `database_config.py` includes your tables
 
 ### No data returned
 - Verify INSERT statements ran successfully

@@ -13,7 +13,7 @@ from utilities.helpers.azure_blob_storage_client import (
 
 bp_batch_start_processing = func.Blueprint()
 logger = logging.getLogger(__name__)
-logger.setLevel(level=os.environ.get("LOGLEVEL", "INFO").upper())
+logger.setLevel(level=os.environ.get("LOGLEVEL", "INFO").strip('"').upper())
 
 
 @bp_batch_start_processing.route(route="BatchStartProcessing")

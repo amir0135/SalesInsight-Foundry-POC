@@ -438,7 +438,7 @@ class ExcelDataSource(DatabaseDataSource):
         Execute a custom SQL query - NOT SUPPORTED for Excel data source.
 
         The Excel data source does not support arbitrary SQL queries.
-        Use the standard query methods instead, or switch to Redshift/PostgreSQL.
+        Use the standard query methods instead, or switch to Snowflake/PostgreSQL.
 
         Args:
             sql_query: SQL query (ignored)
@@ -449,5 +449,5 @@ class ExcelDataSource(DatabaseDataSource):
         raise NotImplementedError(
             "Custom SQL queries are not supported for Excel data source. "
             "Use the standard query methods (get_errors_summary, etc.) or "
-            "configure a Redshift/PostgreSQL connection."
+            "configure a Snowflake/PostgreSQL connection."
         )

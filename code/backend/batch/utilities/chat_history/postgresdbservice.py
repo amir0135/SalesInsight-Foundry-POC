@@ -12,29 +12,47 @@ logger = logging.getLogger(__name__)
 class PostgresConversationClient(DatabaseClientBase):
 
     def __init__(
-        self, user: str, host: str, database: str, enable_message_feedback: bool = False
+        self,
+        user: str,
+        host: str,
+        database: str,
+        enable_message_feedback: bool = False,
+        password: str = None,
+        port: int = 5432,
     ):
         self.env_helper = EnvHelper()
         self.user = user
         self.host = host
         self.database = database
         self.enable_message_feedback = enable_message_feedback
+        self.password = password
+        self.port = port
         self.conn = None
 
     async def connect(self):
         try:
-            credential = get_azure_credential(self.env_helper.MANAGED_IDENTITY_CLIENT_ID)
-            token = credential.get_token(
-                "https://ossrdbms-aad.database.windows.net/.default"
-            ).token
-            self.conn = await asyncpg.connect(
-                user=self.user,
-                host=self.host,
-                database=self.database,
-                password=token,
-                port=5432,
-                ssl=True,
-            )
+            if self.password:
+                # Local development: password-based auth, no SSL
+                self.conn = await asyncpg.connect(
+                    user=self.user,
+                    host=self.host,
+                    database=self.database,
+                    password=self.password,
+                    port=self.port,
+                )
+            else:
+                credential = get_azure_credential(self.env_helper.MANAGED_IDENTITY_CLIENT_ID)
+                token = credential.get_token(
+                    "https://ossrdbms-aad.database.windows.net/.default"
+                ).token
+                self.conn = await asyncpg.connect(
+                    user=self.user,
+                    host=self.host,
+                    database=self.database,
+                    password=token,
+                    port=self.port,
+                    ssl=True,
+                )
         except Exception as e:
             logger.error("Failed to connect to PostgreSQL: %s", e)
             raise

@@ -130,7 +130,7 @@ def setup_config_mocking(httpserver: HTTPServer):
         config_json_string,
         headers={
             "Content-Type": "application/json",
-            "Content-Range": f"bytes 0-{len(config_json_string.encode('utf-8'))-1}/{len(config_json_string.encode('utf-8'))}",
+            "Content-Range": f"bytes 0-{len(config_json_string.encode('utf-8')) - 1}/{len(config_json_string.encode('utf-8'))}",
         },
     )
 

@@ -1,5 +1,5 @@
 {
-	"name": "Chat with your data",
+	"name": "SalesInsight Foundry POC",
 	"build": {
 		"dockerfile": "Dockerfile"
 	},
@@ -15,6 +15,14 @@
 	},
 
 	"postCreateCommand": "./.devcontainer/setupEnv.sh",
+
+	"forwardPorts": [5050, 5173, 8501, 7071],
+	"portsAttributes": {
+		"5173": { "label": "Chat UI", "onAutoForward": "openBrowser" },
+		"5050": { "label": "Flask API" },
+		"8501": { "label": "Admin UI" },
+		"7071": { "label": "Azure Functions" }
+	},
 
 	"customizations": {
 		"vscode": {
@@ -41,6 +49,9 @@
 				"remote.autoForwardPortsFallback": 0,
 				"remote.autoForwardPortsSource": "process"
             }
+		},
+		"codespaces": {
+			"openFiles": ["QUICKSTART.md"]
 		}
 	},
 

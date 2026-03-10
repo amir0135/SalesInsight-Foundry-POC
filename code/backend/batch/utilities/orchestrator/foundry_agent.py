@@ -10,7 +10,6 @@ search, etc.).
 
 import json
 import logging
-import os
 import time as timing_module
 
 from azure.ai.agents.models import (
@@ -23,6 +22,7 @@ from azure.ai.agents.models import (
 from ..common.answer import Answer
 from ..helpers.llm_helper import LLMHelper
 from ..helpers.env_helper import EnvHelper
+from ..helpers.database.data_source_factory import is_database_enabled
 from ..tools.question_answer_tool import QuestionAnswerTool
 from ..tools.text_processing_tool import TextProcessingTool
 from .orchestrator_base import OrchestratorBase
@@ -76,7 +76,7 @@ def _build_tool_definitions() -> list[FunctionToolDefinition]:
     ]
 
     # Add database tools if enabled
-    if os.getenv("USE_REDSHIFT", "false").lower() == "true":
+    if is_database_enabled():
         tools.extend(
             [
                 FunctionToolDefinition(
@@ -154,14 +154,13 @@ def _build_tool_definitions() -> list[FunctionToolDefinition]:
 
 def _get_system_prompt() -> str:
     """Get the system prompt for the Foundry agent."""
-    use_redshift = os.getenv("USE_REDSHIFT", "false").lower() == "true"
     env_helper = EnvHelper()
 
     system_message = env_helper.SEMANTIC_KERNEL_SYSTEM_PROMPT
     if system_message:
         return system_message
 
-    if use_redshift:
+    if is_database_enabled():
         return """You help employees navigate information from documents AND operational databases.
 
 TOOL SELECTION - Choose the RIGHT tool for each question:
@@ -468,10 +467,10 @@ class FoundryAgentOrchestrator(OrchestratorBase):
         from ..tools.database_nl_query_tool import DatabaseNLQueryTool
 
         try:
-            if os.getenv("USE_REDSHIFT", "false").lower() != "true":
+            if not is_database_enabled():
                 answer = Answer(
                     question=user_message,
-                    answer="Database queries are not enabled. Set USE_REDSHIFT=true to enable database integration.",
+                    answer="Database queries are not enabled. Configure a database connection (Snowflake or PostgreSQL) to enable database integration.",
                     source_documents=[],
                 )
             else:

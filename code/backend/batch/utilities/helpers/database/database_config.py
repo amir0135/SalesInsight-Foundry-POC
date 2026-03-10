@@ -1,4 +1,4 @@
-"""Configuration for Redshift/PostgreSQL table and column allowlists.
+"""Configuration for database table and column allowlists.
 
 This matches the actual Database data schema from CSV exports.
 """

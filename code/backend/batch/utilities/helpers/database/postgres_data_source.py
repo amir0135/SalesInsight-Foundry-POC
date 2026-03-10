@@ -1,4 +1,4 @@
-"""Redshift-based Database data source implementation."""
+"""PostgreSQL-based Database data source implementation."""
 
 import logging
 import os
@@ -9,32 +9,32 @@ import psycopg2
 from psycopg2 import sql
 
 from .data_source_interface import DatabaseDataSource
-from .redshift_config import validate_table, ALLOWED_TABLES
+from .database_config import validate_table, ALLOWED_TABLES
 from ..azure_ai_integration import get_schema_cache, trace_operation
 
 logger = logging.getLogger(__name__)
 
 
-class RedshiftDataSource(DatabaseDataSource):
-    """Redshift-based implementation of Database data source."""
+class PostgresDataSource(DatabaseDataSource):
+    """PostgreSQL-based implementation of Database data source."""
 
     def __init__(self):
-        """Initialize Redshift data source using environment variables."""
-        self.host = os.getenv("REDSHIFT_HOST")
-        self.port = os.getenv("REDSHIFT_PORT", "5439")
-        self.database = os.getenv("REDSHIFT_DB")
-        self.user = os.getenv("REDSHIFT_USER")
-        self.password = os.getenv("REDSHIFT_PASSWORD")
-        self.schema = os.getenv("REDSHIFT_SCHEMA", "public")
+        """Initialize PostgreSQL data source using environment variables."""
+        self.host = os.getenv("POSTGRES_HOST")
+        self.port = os.getenv("POSTGRES_PORT", "5432")
+        self.database = os.getenv("POSTGRES_DB")
+        self.user = os.getenv("POSTGRES_USER")
+        self.password = os.getenv("POSTGRES_PASSWORD")
+        self.schema = os.getenv("POSTGRES_SCHEMA", "public")
 
         if not all([self.host, self.database, self.user, self.password]):
             raise ValueError(
-                "Missing required Redshift environment variables: "
-                "REDSHIFT_HOST, REDSHIFT_DB, REDSHIFT_USER, REDSHIFT_PASSWORD"
+                "Missing required PostgreSQL environment variables: "
+                "POSTGRES_HOST, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD"
             )
 
         logger.info(
-            "Initialized Redshift data source: %s@%s:%s/%s",
+            "Initialized PostgreSQL data source: %s@%s:%s/%s",
             self.user,
             self.host,
             self.port,
@@ -197,7 +197,7 @@ class RedshiftDataSource(DatabaseDataSource):
 
         if not schema_info:
             # Fall back to static schema
-            from .redshift_config import get_schema_for_prompt
+            from .database_config import get_schema_for_prompt
 
             return get_schema_for_prompt()
 
@@ -250,7 +250,7 @@ class RedshiftDataSource(DatabaseDataSource):
         logger.info("Schema cache refreshed")
 
     def _get_connection(self):
-        """Create a connection to Redshift/PostgreSQL."""
+        """Create a connection to PostgreSQL."""
         # Use DSN string to pass gssencmode=disable which prevents
         # libpq 17+ from hanging on GSS encryption negotiation with
         # older PostgreSQL servers (e.g. PG 15 in local Docker).
@@ -301,7 +301,7 @@ class RedshiftDataSource(DatabaseDataSource):
             raise ValueError(f"Table '{table_name}' is not in the allowlist")
 
     def _format_result(
-        self, query_result: Dict, metadata: Dict, source: str = "redshift"
+        self, query_result: Dict, metadata: Dict, source: str = "database"
     ) -> Dict:
         """Format query result as standard dict."""
         return {
@@ -765,7 +765,7 @@ class RedshiftDataSource(DatabaseDataSource):
                 "columns": columns,
                 "rows": [list(row) for row in rows],
                 "metadata": {
-                    "source": "redshift",
+                    "source": "database",
                     "rowCount": len(rows),
                     "truncated": truncated,
                     "max_rows": max_rows,

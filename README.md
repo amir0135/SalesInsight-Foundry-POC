@@ -22,9 +22,13 @@ urlFragment: salesinsight-foundry-poc
 
 # SalesInsight Foundry POC
 
-An AI-powered sales analytics platform that combines **document-based RAG** (Retrieval-Augmented Generation) with **natural language SQL queries** against sales databases. Built on Azure OpenAI and Azure AI Foundry, with support for Snowflake, PostgreSQL, and Redshift data sources.
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/amir0135/SalesInsight-Foundry-POC?quickstart=1)
+
+An AI-powered sales analytics platform that combines **document-based RAG** (Retrieval-Augmented Generation) with **natural language SQL queries** against sales databases. Built on Azure OpenAI and Azure AI Foundry, with support for Snowflake and PostgreSQL data sources.
 
 > Based on the [Chat with your data Solution Accelerator](https://github.com/Azure-Samples/chat-with-your-data-solution-accelerator), extended with NL2SQL capabilities, sales-focused analytics, and Azure AI Foundry Agent orchestration.
+
+> **Want to test with your own Snowflake account?** Click the button above to open in Codespaces, or see [QUICKSTART.md](QUICKSTART.md) for local setup.
 
 ## Table of Contents
 
@@ -54,7 +58,7 @@ An AI-powered sales analytics platform that combines **document-based RAG** (Ret
 - **Sales Analytics**: Purpose-built for querying sales order history — best-selling styles, turnover by market/brand, collection performance, and fiscal year reporting
 - **Azure AI Foundry Agent**: New orchestration strategy using Foundry Agent Service with thread-based tool calling
 - **Multiple Orchestrators**: Choose from Semantic Kernel, LangChain, OpenAI Functions, Prompt Flow, or Foundry Agent
-- **Multi-Database Support**: Query Snowflake (production), PostgreSQL (local/analytics), or Redshift, with a local CSV fallback for development
+- **Multi-Database Support**: Query Snowflake (production) or PostgreSQL (local/analytics), with a local CSV fallback for development
 - **Automatic Visualizations**: Bar charts generated from SQL query results
 - **Admin UI**: Streamlit-based interface for document ingestion, data exploration, prompt configuration, and database connection management
 - **SQL Validation**: Security guardrails enforce SELECT-only queries with table/column allowlists and dangerous pattern detection
@@ -117,7 +121,6 @@ Data Sources:
 ├── Azure AI Search ─── Document vectors + RAG retrieval
 ├── Snowflake ───────── Production sales data (OrderHistoryLine)
 ├── PostgreSQL ──────── Local dev + chat history
-├── Redshift ────────── Legacy sales data (optional)
 ├── Azure Blob Storage ─ Document staging + config
 └── Cosmos DB ───────── Chat history (alternative to PostgreSQL)
 ```
@@ -125,7 +128,7 @@ Data Sources:
 ### Data Flow
 
 1. **Documents**: Uploaded via Admin UI → stored in Azure Blob Storage → Azure Functions chunk and embed → indexed in Azure AI Search
-2. **Sales Queries**: User asks a natural language question → NL2SQL engine generates validated SQL → executes against Snowflake/PostgreSQL/Redshift → results returned with optional chart
+2. **Sales Queries**: User asks a natural language question → NL2SQL engine generates validated SQL → executes against Snowflake/PostgreSQL → results returned with optional chart
 3. **Chat**: Queries hit Flask API → orchestrator retrieves context (documents and/or SQL results) → LLM generates response
 
 ---
@@ -160,7 +163,18 @@ Upload internal documents (contracts, product manuals, policies) and ask questio
 
 ## Getting Started
 
-### Prerequisites
+### GitHub Codespaces (no local install needed)
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/amir0135/SalesInsight-Foundry-POC?quickstart=1)
+
+1. Add your Snowflake and Azure OpenAI secrets in **repo Settings → Secrets → Codespaces**
+2. Click the button above
+3. Once built, run `./start_local.sh --skip-azure` in the terminal
+4. Open port 5173 from the Ports tab
+
+Full details in [QUICKSTART.md](QUICKSTART.md#option-0-github-codespaces-fastest--no-local-install).
+
+### Prerequisites (local)
 
 - Python 3.10+
 - Node.js 18+
@@ -171,7 +185,9 @@ Upload internal documents (contracts, product manuals, policies) and ask questio
 
 ### Local Development
 
-The recommended setup:
+> **Fastest path**: Run `./scripts/quickstart_snowflake.sh` — it handles everything interactively. See [QUICKSTART.md](QUICKSTART.md).
+
+The recommended manual setup:
 
 ```bash
 # Clone and enter the repo
@@ -241,8 +257,7 @@ The NL2SQL engine supports multiple data sources for sales queries. Configure vi
 | Source | Use Case | Key Environment Variables |
 |--------|----------|--------------------------|
 | **Snowflake** | Production sales data | `SNOWFLAKE_ACCOUNT`, `SNOWFLAKE_USER`, `SNOWFLAKE_PASSWORD`, `SNOWFLAKE_DATABASE` |
-| **PostgreSQL** | Local development / analytics | `REDSHIFT_HOST=localhost`, `REDSHIFT_PORT=5432` |
-| **Redshift** | Legacy production data | `REDSHIFT_HOST`, `REDSHIFT_PORT=5439` |
+| **PostgreSQL** | Local development / analytics | `POSTGRES_HOST`, `POSTGRES_PORT=5432` |
 | **Local CSV** | Offline development fallback | Loads from `data/` directory |
 
 For Snowflake setup details, see [docs/snowflake_setup.md](docs/snowflake_setup.md).
@@ -269,9 +284,8 @@ CONVERSATION_FLOW=custom                  # or byod
 DATABASE_TYPE=PostgreSQL                  # or CosmosDB
 
 # NL2SQL / Sales Queries
-USE_REDSHIFT=true
-REDSHIFT_HOST=localhost
-REDSHIFT_PORT=5432
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
 
 # Snowflake (optional)
 SNOWFLAKE_ACCOUNT=your-account

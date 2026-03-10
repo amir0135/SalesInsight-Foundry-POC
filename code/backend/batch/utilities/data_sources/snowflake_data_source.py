@@ -292,7 +292,7 @@ class SnowflakeDataSource(BaseDataSource):
 
                 # Get columns for this table
                 columns_query = f"""
-                    SELECT 
+                    SELECT
                         COLUMN_NAME,
                         DATA_TYPE,
                         IS_NULLABLE,

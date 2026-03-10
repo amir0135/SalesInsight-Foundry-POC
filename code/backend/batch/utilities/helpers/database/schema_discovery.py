@@ -32,14 +32,14 @@ def get_database_connection():
     import psycopg2
 
     return psycopg2.connect(
-        host=os.getenv("REDSHIFT_HOST", os.getenv("POSTGRES_HOST", "localhost")),
-        port=int(os.getenv("REDSHIFT_PORT", os.getenv("POSTGRES_PORT", "5432"))),
+        host=os.getenv("POSTGRES_HOST", "localhost"),
+        port=int(os.getenv("POSTGRES_PORT", "5432")),
         database=os.getenv(
-            "REDSHIFT_DATABASE", os.getenv("POSTGRES_DATABASE", "database")
+            "POSTGRES_DATABASE", os.getenv("POSTGRES_DB", "database")
         ),
-        user=os.getenv("REDSHIFT_USER", os.getenv("POSTGRES_USER", "postgres")),
+        user=os.getenv("POSTGRES_USER", "postgres"),
         password=os.getenv(
-            "REDSHIFT_PASSWORD", os.getenv("POSTGRES_PASSWORD", "postgres")
+            "POSTGRES_PASSWORD", "postgres"
         ),
     )
 

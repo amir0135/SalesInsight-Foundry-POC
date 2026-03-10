@@ -139,7 +139,7 @@ This includes **database integration** for querying operational data via natural
 - Query errors, connectivity, sessions, and facility data
 - Smart schema retrieval (only loads relevant tables)
 - **Data visualization** - automatically generates charts based on query results
-- Works with PostgreSQL (local) or AWS Redshift (production)
+- Works with PostgreSQL (local) or Snowflake (production)
 
 ### Example Queries
 - "How many total errors occurred in the last 7 days?"
@@ -170,16 +170,17 @@ To populate the test database with sample data:
 python -c "from code.backend.batch.utilities.helpers.database.load_test_data import load_all_test_data; load_all_test_data()"
 ```
 
-### Production Redshift Configuration
+### Production PostgreSQL Configuration
 
 For production, update `.env`:
 
 ```bash
-REDSHIFT_HOST=your-cluster.region.redshift.amazonaws.com
-REDSHIFT_PORT=5439
-REDSHIFT_DB=your_database
-REDSHIFT_USER=your_user
-REDSHIFT_PASSWORD=your_password
+POSTGRES_HOST=your-server.postgres.database.azure.com
+POSTGRES_PORT=5432
+POSTGRES_DB=your_database
+POSTGRES_USER=your_user
+POSTGRES_PASSWORD=your_password
+POSTGRES_SCHEMA=public
 ```
 
 ## Document Ingestion

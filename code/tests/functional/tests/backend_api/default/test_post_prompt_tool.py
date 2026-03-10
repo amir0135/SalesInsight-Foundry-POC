@@ -57,7 +57,7 @@ def setup_config_mocking(httpserver: HTTPServer):
         config_json_string,
         headers={
             "Content-Type": "application/json",
-            "Content-Range": f"bytes 0-{len(config_json_string.encode('utf-8'))-1}/{len(config_json_string.encode('utf-8'))}",
+            "Content-Range": f"bytes 0-{len(config_json_string.encode('utf-8')) - 1}/{len(config_json_string.encode('utf-8'))}",
         },
     )
 
@@ -65,7 +65,7 @@ def setup_config_mocking(httpserver: HTTPServer):
 @pytest.fixture(autouse=True)
 def completions_mocking(httpserver: HTTPServer, app_config: AppConfig):
     httpserver.expect_oneshot_request(
-        f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO','model')}/chat/completions",
+        f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO', 'model')}/chat/completions",
         method="POST",
     ).respond_with_json(
         {
@@ -96,7 +96,7 @@ def completions_mocking(httpserver: HTTPServer, app_config: AppConfig):
 
     httpserver.expect_oneshot_request(
         re.compile(
-            f"/openai/deployments/({app_config.get_from_json('AZURE_OPENAI_MODEL_INFO','model')}|{app_config.get('AZURE_OPENAI_VISION_MODEL')})/chat/completions"
+            f"/openai/deployments/({app_config.get_from_json('AZURE_OPENAI_MODEL_INFO', 'model')}|{app_config.get('AZURE_OPENAI_VISION_MODEL')})/chat/completions"
         ),
         method="POST",
     ).respond_with_json(
@@ -129,7 +129,7 @@ def test_post_responds_successfully_when_not_filtered(
 ):
     # given
     httpserver.expect_oneshot_request(
-        f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO','model')}/chat/completions",
+        f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO', 'model')}/chat/completions",
         method="POST",
     ).respond_with_json(
         {
@@ -190,7 +190,7 @@ def test_post_responds_successfully_when_filtered(
 ):
     # given
     httpserver.expect_oneshot_request(
-        f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO','model')}/chat/completions",
+        f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO', 'model')}/chat/completions",
         method="POST",
     ).respond_with_json(
         {
@@ -251,7 +251,7 @@ def test_post_makes_correct_call_to_openai_from_post_prompt_tool(
 ):
     # given
     httpserver.expect_oneshot_request(
-        f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO','model')}/chat/completions",
+        f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO', 'model')}/chat/completions",
         method="POST",
     ).respond_with_json(
         {
@@ -284,7 +284,7 @@ def test_post_makes_correct_call_to_openai_from_post_prompt_tool(
     verify_request_made(
         mock_httpserver=httpserver,
         request_matcher=RequestMatcher(
-            path=f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO','model')}/chat/completions",
+            path=f"/openai/deployments/{app_config.get_from_json('AZURE_OPENAI_MODEL_INFO', 'model')}/chat/completions",
             method="POST",
             json={
                 "messages": [

@@ -15,12 +15,15 @@ def test_env_helper_is_singleton():
     assert EnvHelper() is EnvHelper()
 
 
+@patch("backend.batch.utilities.helpers.env_helper.load_dotenv")
 def test_openai_base_url_generates_url_based_on_resource_name_if_not_set(
+    load_dotenv_mock,
     monkeypatch: MonkeyPatch,
 ):
     # given
     openai_resource_name = "some-openai-resource"
     monkeypatch.setenv("AZURE_OPENAI_RESOURCE", openai_resource_name)
+    monkeypatch.delenv("AZURE_OPENAI_ENDPOINT", raising=False)
 
     # when
     actual_openai_endpoint = EnvHelper().AZURE_OPENAI_ENDPOINT
@@ -45,10 +48,13 @@ def test_openai_base_url_uses_env_var_if_set(monkeypatch: MonkeyPatch):
     "value,expected",
     [("true", True), ("false", False), ("this is the way", False), (None, True)],
 )
-def test_load_config_from_blob_storage(monkeypatch: MonkeyPatch, value, expected):
+@patch("backend.batch.utilities.helpers.env_helper.load_dotenv")
+def test_load_config_from_blob_storage(load_dotenv_mock, monkeypatch: MonkeyPatch, value, expected):
     # given
     if value is not None:
         monkeypatch.setenv("LOAD_CONFIG_FROM_BLOB_STORAGE", value)
+    else:
+        monkeypatch.delenv("LOAD_CONFIG_FROM_BLOB_STORAGE", raising=False)
 
     # when
     actual_load_config_from_blob_storage = EnvHelper().LOAD_CONFIG_FROM_BLOB_STORAGE

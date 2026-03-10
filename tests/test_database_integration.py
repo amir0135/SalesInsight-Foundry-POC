@@ -28,11 +28,11 @@ import re
 # Configuration
 API_URL = "http://127.0.0.1:5050/api/conversation"
 DB_CONFIG = {
-    "host": os.getenv("REDSHIFT_HOST", "localhost"),
-    "port": os.getenv("REDSHIFT_PORT", "5432"),
-    "database": os.getenv("REDSHIFT_DB", "database_test"),
-    "user": os.getenv("REDSHIFT_USER", "testuser"),
-    "password": os.getenv("REDSHIFT_PASSWORD", "testpassword"),
+    "host": os.getenv("POSTGRES_HOST", "localhost"),
+    "port": os.getenv("POSTGRES_PORT", "5432"),
+    "database": os.getenv("POSTGRES_DB", "database_test"),
+    "user": os.getenv("POSTGRES_USER", "testuser"),
+    "password": os.getenv("POSTGRES_PASSWORD", "testpassword"),
 }
 
 # Test results
@@ -431,11 +431,11 @@ def run_all_tests():
 def main():
     """Main entry point."""
     # Set environment variables if not set
-    os.environ.setdefault("REDSHIFT_HOST", "localhost")
-    os.environ.setdefault("REDSHIFT_PORT", "5432")
-    os.environ.setdefault("REDSHIFT_DB", "database_test")
-    os.environ.setdefault("REDSHIFT_USER", "testuser")
-    os.environ.setdefault("REDSHIFT_PASSWORD", "testpassword")
+    os.environ.setdefault("POSTGRES_HOST", "localhost")
+    os.environ.setdefault("POSTGRES_PORT", "5432")
+    os.environ.setdefault("POSTGRES_DB", "database_test")
+    os.environ.setdefault("POSTGRES_USER", "testuser")
+    os.environ.setdefault("POSTGRES_PASSWORD", "testpassword")
 
     exit_code = run_all_tests()
     sys.exit(exit_code)

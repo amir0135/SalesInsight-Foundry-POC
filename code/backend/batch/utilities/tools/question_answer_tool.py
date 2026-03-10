@@ -49,7 +49,7 @@ class QuestionAnswerTool(AnsweringToolBase):
 
     def generate_messages(self, question: str, sources: list[SourceDocument]):
         sources_text = "\n\n".join(
-            [f"[doc{i+1}]: {source.content}" for i, source in enumerate(sources)]
+            [f"[doc{i + 1}]: {source.content}" for i, source in enumerate(sources)]
         )
 
         logger.info(
@@ -112,7 +112,7 @@ class QuestionAnswerTool(AnsweringToolBase):
         documents = json.dumps(
             {
                 "retrieved_documents": [
-                    {f"[doc{i+1}]": {"content": source.content}}
+                    {f"[doc{i + 1}]": {"content": source.content}}
                     for i, source in enumerate(sources)
                 ],
             },

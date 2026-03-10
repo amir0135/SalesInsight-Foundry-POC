@@ -244,4 +244,3 @@ def sample_chart_config() -> Dict[str, Any]:
         "max_items": 10,
         "figure_size": (10, 6),
     }
-

@@ -35,6 +35,7 @@ RULES:
 7. Use lowercase for column names.
 8. For "top products by revenue": GROUP BY stylenumber, ORDER BY revenue DESC
 9. Use WHERE softdeleted = false to exclude deleted orders unless asked otherwise.
+10. If the question is too vague or contains terms that don't map to any column (e.g. "menu"), respond with ONLY: CLARIFY: followed by a brief question asking the user to be more specific. Example: CLARIFY: Could you specify what you mean by "menu"? Available data includes products (stylenumber), pricing, quantities, order status, currencies, brands, and delivery dates.
 
 Examples:
 - "What are the top 10 products by revenue?" ->

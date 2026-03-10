@@ -11,7 +11,7 @@ from utilities.search.search import Search
 
 bp_batch_push_results = func.Blueprint()
 logger = logging.getLogger(__name__)
-logger.setLevel(level=os.environ.get("LOGLEVEL", "INFO").upper())
+logger.setLevel(level=os.environ.get("LOGLEVEL", "INFO").strip('"').upper())
 queue_name = os.environ.get("DOCUMENT_PROCESSING_QUEUE_NAME", "doc-processing")
 
 

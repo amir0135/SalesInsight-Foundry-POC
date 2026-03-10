@@ -5,6 +5,7 @@ import json
 from .orchestrator_base import OrchestratorBase
 from ..helpers.llm_helper import LLMHelper
 from ..helpers.env_helper import EnvHelper
+from ..helpers.database.data_source_factory import is_database_enabled
 from ..tools.post_prompt_tool import PostPromptTool
 from ..tools.question_answer_tool import QuestionAnswerTool
 from ..tools.text_processing_tool import TextProcessingTool
@@ -177,14 +178,13 @@ class OpenAIFunctionsOrchestrator(OrchestratorBase):
         Handle /database command by directly calling the Database query tool.
         Bypasses function selection for guaranteed database queries.
         """
-        import os
         from ..tools.database_nl_query_tool import DatabaseNLQueryTool
 
         try:
-            if os.getenv("USE_REDSHIFT", "false").lower() != "true":
+            if not is_database_enabled():
                 answer = Answer(
                     question=user_message,
-                    answer="Database queries are not enabled. Set USE_REDSHIFT=true to enable Database database integration.",
+                    answer="Database queries are not enabled. Configure a database connection (Snowflake or PostgreSQL) to enable database integration.",
                     source_documents=[],
                 )
             else:

@@ -130,7 +130,6 @@ def _suggest_chart_type(
     # Keywords that suggest specific chart types
     trend_keywords = ["trend", "over time", "history", "daily", "weekly", "monthly", "timeline"]
     distribution_keywords = ["distribution", "breakdown", "proportion", "percentage", "share"]
-    comparison_keywords = ["compare", "comparison", "top", "most", "highest", "lowest", "rank"]
 
     # Determine chart type
     if any(kw in question_lower for kw in trend_keywords) and temporal_cols and numeric_cols:

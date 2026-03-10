@@ -34,7 +34,7 @@ class EnvHelper:
         # Wrapper for Azure Key Vault
         self.secretHelper = SecretHelper()
 
-        self.LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
+        self.LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").strip('"').upper()
         self.APP_ENV = os.getenv("APP_ENV", "Prod").lower()
 
         # Azure
@@ -109,7 +109,7 @@ class EnvHelper:
         # Chat History DB Integration Settings
         # Set default values based on DATABASE_TYPE
         self.DATABASE_TYPE = (
-            os.getenv("DATABASE_TYPE", "").strip() or DatabaseType.COSMOSDB.value
+            os.getenv("DATABASE_TYPE", "").strip().strip('"') or DatabaseType.COSMOSDB.value
         )
         # Cosmos DB configuration
         if self.DATABASE_TYPE == DatabaseType.COSMOSDB.value:

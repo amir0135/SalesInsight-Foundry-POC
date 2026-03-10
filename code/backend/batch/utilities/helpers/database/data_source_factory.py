@@ -6,11 +6,25 @@ from typing import Optional
 
 from .data_source_interface import DatabaseDataSource
 from .excel_data_source import ExcelDataSource
-from .redshift_data_source import RedshiftDataSource
+from .postgres_data_source import PostgresDataSource
 
 logger = logging.getLogger(__name__)
 
 _data_source_instance: Optional[DatabaseDataSource] = None
+
+
+def is_database_enabled() -> bool:
+    """Check if any database integration is configured.
+
+    Returns True if Snowflake or PostgreSQL credentials are available.
+    """
+    if os.getenv("SALESINSIGHT_USE_LOCAL_DATA", "false").lower() == "true":
+        return False
+    if os.getenv("SNOWFLAKE_ACCOUNT"):
+        return True
+    if os.getenv("POSTGRES_HOST"):
+        return True
+    return False
 
 
 def get_data_source() -> DatabaseDataSource:
@@ -18,12 +32,11 @@ def get_data_source() -> DatabaseDataSource:
     Get the appropriate Database data source based on configuration.
 
     Returns:
-        DatabaseDataSource instance (Redshift or Excel fallback)
+        DatabaseDataSource instance (PostgreSQL or Excel fallback)
 
-    The function checks for:
-    1. USE_REDSHIFT environment variable = "true"
-    2. All required REDSHIFT_* environment variables exist
-    3. Falls back to Excel if conditions not met
+    Priority:
+    1. PostgreSQL if POSTGRES_HOST is set
+    2. Falls back to Excel/local CSV data
 
     This is a singleton - the same instance is returned on subsequent calls.
     """
@@ -32,41 +45,42 @@ def get_data_source() -> DatabaseDataSource:
     if _data_source_instance is not None:
         return _data_source_instance
 
-    use_redshift = os.getenv("USE_REDSHIFT", "false").lower() == "true"
+    use_postgres = bool(os.getenv("POSTGRES_HOST"))
 
-    if use_redshift:
+    if use_postgres:
         try:
-            # Check if all required Redshift env vars are present
             required_vars = [
-                "REDSHIFT_HOST",
-                "REDSHIFT_DB",
-                "REDSHIFT_USER",
-                "REDSHIFT_PASSWORD",
+                "POSTGRES_HOST",
+                "POSTGRES_DB",
+                "POSTGRES_USER",
+                "POSTGRES_PASSWORD",
             ]
 
             missing_vars = [var for var in required_vars if not os.getenv(var)]
 
             if missing_vars:
                 logger.warning(
-                    f"USE_REDSHIFT=true but missing environment variables: {', '.join(missing_vars)}. "
+                    f"POSTGRES_HOST set but missing environment variables: {', '.join(missing_vars)}. "
                     "Falling back to Excel data source."
                 )
                 _data_source_instance = ExcelDataSource()
             else:
-                logger.info("Initializing Redshift data source")
-                _data_source_instance = RedshiftDataSource()
-                logger.info("Redshift data source active")
+                logger.info("Initializing PostgreSQL data source")
+                _data_source_instance = PostgresDataSource()
+                logger.info("PostgreSQL data source active")
 
         except Exception as e:
             logger.error(
-                f"Failed to initialize Redshift data source: {str(e)}. "
+                f"Failed to initialize PostgreSQL data source: {str(e)}. "
                 "Falling back to Excel data source."
             )
             _data_source_instance = ExcelDataSource()
     else:
-        logger.info("Initializing Excel data source (USE_REDSHIFT not set to true)")
+        logger.info("Initializing Excel data source (no database configured)")
         _data_source_instance = ExcelDataSource()
         logger.info("Excel data source active")
+
+    return _data_source_instance
 
     return _data_source_instance
 
