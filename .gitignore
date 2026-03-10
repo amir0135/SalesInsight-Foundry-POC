@@ -9,10 +9,11 @@ data/*.csv
 !data/sample_data.csv
 data/*.xlsx
 data/*.pdf
+data/contract_data/*.pdf
 
 # generated frontend files
 code/dist/
-code/frontend/coverage
+code/frontend/coverage/
 
 # User-specific files
 *.rsuser
@@ -444,3 +445,10 @@ data/testtrack/*.xlsx
 .DS_Store
 .env copy
 .env
+
+# Test artifacts
+*.test.png
+test_chart_output.png
+
+# Pytest cache
+.pytest_cache/

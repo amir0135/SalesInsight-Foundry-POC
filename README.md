@@ -28,7 +28,7 @@ An AI-powered sales analytics platform that combines **document-based RAG** (Ret
 
 > Based on the [Chat with your data Solution Accelerator](https://github.com/Azure-Samples/chat-with-your-data-solution-accelerator), extended with NL2SQL capabilities, sales-focused analytics, and Azure AI Foundry Agent orchestration.
 
-> **Want to test with your own Snowflake account?** Click the button above to open in Codespaces, or see [QUICKSTART.md](QUICKSTART.md) for local setup.
+> **Want to test with your own Snowflake account?** Click the button above to open in Codespaces, or see [Getting Started](GETTING_STARTED.md) for local setup.
 
 ## Table of Contents
 
@@ -163,76 +163,37 @@ Upload internal documents (contracts, product manuals, policies) and ask questio
 
 ## Getting Started
 
-### GitHub Codespaces (no local install needed)
+Follow the [Getting Started guide](GETTING_STARTED.md) — it walks you through deploying Azure resources, cloning the repo, and running the app in three steps.
 
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/amir0135/SalesInsight-Foundry-POC?quickstart=1)
-
-1. Add your Snowflake and Azure OpenAI secrets in **repo Settings → Secrets → Codespaces**
-2. Click the button above
-3. Once built, run `./start_local.sh --skip-azure` in the terminal
-4. Open port 5173 from the Ports tab
-
-Full details in [QUICKSTART.md](QUICKSTART.md#option-0-github-codespaces-fastest--no-local-install).
-
-### Prerequisites (local)
-
-- Python 3.10+
-- Node.js 18+
-- [Poetry](https://python-poetry.org/) for dependency management
-- [Azure Developer CLI (`azd`)](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd) for deployment
-- Docker (for local PostgreSQL)
-- Azure subscription with Azure OpenAI access
-
-### Local Development
-
-> **Fastest path**: Run `./scripts/quickstart_snowflake.sh` — it handles everything interactively. See [QUICKSTART.md](QUICKSTART.md).
-
-The recommended manual setup:
+### Quick overview
 
 ```bash
-# Clone and enter the repo
+# 1. Deploy Azure resources
+azd up
+
+# 2. Clone and configure
 git clone https://github.com/amir0135/SalesInsight-Foundry-POC.git
 cd SalesInsight-Foundry-POC
+./scripts/setup_local.sh
 
-# Install dependencies
+# 3. Install and run
 poetry install
 cd code/frontend && npm install && cd ../..
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your Azure OpenAI, AI Search, and Blob Storage credentials
-
-# Start all services (Flask, Vite, PostgreSQL container)
 ./start_local.sh
 ```
 
-Services will be available at:
+Open the **Chat UI** at http://localhost:5173.
 
-| Service | URL |
-|---------|-----|
-| Chat UI | http://localhost:5173 |
-| Chat API | http://localhost:5050 |
-| Admin UI | http://localhost:8501 |
-| Azure Functions | http://localhost:7071 |
+### GitHub Codespaces (no local install)
 
-Use `./stop_local.sh` to shut everything down.
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/amir0135/SalesInsight-Foundry-POC?quickstart=1)
 
-If you've already provisioned Azure resources with `azd`, you can pull the configuration automatically:
+Add your secrets in repo **Settings → Secrets → Codespaces**, then run `./start_local.sh --skip-azure`.
 
-```bash
-./scripts/setup_local.sh    # Pulls config from Azure
-./start_local.sh             # Starts all services
-```
+### More options
 
-### Docker Quick Start
-
-```bash
-cp .env.example .env
-# Edit .env with your credentials
-docker-compose -f docker/docker-compose.local.yml up --build
-```
-
-Chat UI at http://localhost:8080, Admin UI at http://localhost:8501.
+- **Docker setup, manual config, troubleshooting** → [Local Development Guide](docs/LOCAL_DEVELOPMENT.md)
+- **Snowflake NL2SQL quickstart** → Run `./scripts/quickstart_snowflake.sh`
 
 ---
 
@@ -281,7 +242,7 @@ ORCHESTRATION_STRATEGY=semantic_kernel    # or foundry_agent, langchain, etc.
 CONVERSATION_FLOW=custom                  # or byod
 
 # Database (chat history)
-DATABASE_TYPE=PostgreSQL                  # or CosmosDB
+DATABASE_TYPE=CosmosDB                    # or PostgreSQL
 
 # NL2SQL / Sales Queries
 POSTGRES_HOST=localhost
@@ -312,11 +273,11 @@ azd deploy adminweb     # Admin UI
 azd deploy function     # Background processing
 ```
 
-All three services deploy as **Azure Container Apps**. The infrastructure is defined in [infra/main.bicep](infra/main.bicep).
+All three services deploy as **Azure App Service** (Docker containers). The infrastructure is defined in [infra/main.bicep](infra/main.bicep).
 
 ### Supported Azure Regions
 
-The solution has been tested with the following regions:
+The solution supports the following regions:
 
 - **Australia East**
 - **East US 2**
@@ -349,8 +310,14 @@ make lint
 # NL2SQL evaluation (offline, no LLM required)
 make evaluate
 
+# NL2SQL evaluation with LLM scoring
+make evaluate-llm
+
 # Full evaluation with Azure AI Foundry scoring
 make evaluate-full
+
+# Regenerate golden dataset from current data
+make generate-eval-dataset
 ```
 
 Test markers (in `pytest.ini`):
@@ -382,7 +349,7 @@ Test markers (in `pytest.ini`):
 │   │           │   ├── strategies.py
 │   │           │   ├── semantic_kernel.py
 │   │           │   ├── foundry_agent.py
-│   │           │   ├── lang_chain.py
+│   │           │   ├── lang_chain_agent.py
 │   │           │   └── ...
 │   │           ├── nl2sql/             # Natural language to SQL engine
 │   │           │   ├── sql_generator.py
@@ -411,7 +378,7 @@ Test markers (in `pytest.ini`):
 
 ## Supporting Documentation
 
-- [Local Setup Guide](docs/SETUP.md)
+- [Local Development Guide](docs/LOCAL_DEVELOPMENT.md)
 - [Database Integration](docs/database_integration.md)
 - [Database AI Query Implementation](docs/database_ai_query_implementation.md)
 - [Snowflake Setup](docs/snowflake_setup.md)
