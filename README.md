@@ -293,8 +293,17 @@ The solution supports the following regions:
 ### Post-Deployment
 
 1. [Set up authentication in Azure App Service](./docs/azure_app_service_auth_setup.md)
-2. Navigate to the Admin UI to upload documents and configure database connections
-3. Open the Chat UI to start querying
+2. Create the Function App key (not created automatically by the deployment):
+   ```bash
+   FUNCTION_KEY=$(az keyvault secret show --vault-name <kv-name> --name FUNCTION-KEY --query value -o tsv)
+   az functionapp keys set -g <rg> -n <func-app> --key-type functionKeys --key-name ClientKey --key-value "$FUNCTION_KEY"
+   ```
+3. **PostgreSQL only** — Set up the database tables:
+   ```bash
+   bash scripts/run_create_table_script.sh <app-base-url> <resource-group> <pg-fqdn> <managed-identity-name>
+   ```
+4. Navigate to the Admin UI to upload documents and configure database connections
+5. Open the Chat UI to start querying
 
 ---
 

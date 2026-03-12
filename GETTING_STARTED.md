@@ -16,7 +16,41 @@ During deployment you will choose a **region** and **database type** (PostgreSQL
 
 > **Note:** The default deployment uses **GPT-4.1** (version 2025-04-14). Ensure this model is available in your chosen region.
 
-When deployment is complete, [set up authentication in Azure App Service](docs/azure_app_service_auth_setup.md).
+When deployment is complete, run these **post-deployment steps**:
+
+### Post-Deployment Setup
+
+**1. Set up authentication** — [Azure App Service auth guide](docs/azure_app_service_auth_setup.md)
+
+**2. Create the Function App key** — The deployment does not create a function key automatically. Run:
+
+```bash
+# Get the function key value from Key Vault
+FUNCTION_KEY=$(az keyvault secret show \
+  --vault-name <your-keyvault-name> \
+  --name FUNCTION-KEY \
+  --query value -o tsv)
+
+# Set the key on the Function App
+az functionapp keys set \
+  -g <your-resource-group> \
+  -n <your-function-app-name> \
+  --key-type functionKeys \
+  --key-name ClientKey \
+  --key-value "$FUNCTION_KEY"
+```
+
+**3. Set up the PostgreSQL database** (only if you chose PostgreSQL as database type):
+
+```bash
+bash scripts/run_create_table_script.sh \
+  <app-base-url> \
+  <your-resource-group> \
+  <postgres-fqdn> \
+  <managed-identity-name>
+```
+
+> **Tip:** All resource names follow the pattern `<resource-prefix>-cwyd<solutionUniqueText>`. You can find them in the Azure Portal under your resource group.
 
 ---
 
