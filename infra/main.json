@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "4943441124117576606"
+      "templateHash": "16679306013944718830"
     }
   },
   "parameters": {
@@ -796,6 +796,24 @@
           }
         }
       }
+    },
+    "foundryHubAIServicesConnection": {
+      "type": "Microsoft.MachineLearningServices/workspaces/connections",
+      "apiVersion": "2024-10-01",
+      "name": "[format('{0}/aiservices-connection', variables('foundryHubName'))]",
+      "properties": {
+        "category": "AIServices",
+        "target": "[reference('openai').outputs.endpoint.value]",
+        "authType": "AAD",
+        "metadata": {
+          "ApiType": "Azure",
+          "ResourceId": "[reference('openai').outputs.resourceId.value]"
+        }
+      },
+      "dependsOn": [
+        "foundryHub",
+        "openai"
+      ]
     },
     "virtualNetwork": {
       "condition": "[parameters('enablePrivateNetworking')]",
@@ -38427,7 +38445,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.37.4.10188",
-              "templateHash": "976775273218650526"
+              "templateHash": "2849018109257929247"
             }
           },
           "parameters": {
@@ -38610,10 +38628,11 @@
             },
             "waitFunctionDeploymentSection": {
               "type": "Microsoft.Resources/deploymentScripts",
-              "apiVersion": "2020-10-01",
+              "apiVersion": "2023-08-01",
               "name": "WaitFunctionDeploymentSection",
               "kind": "AzurePowerShell",
               "location": "[parameters('location')]",
+              "identity": "[if(not(empty(parameters('userAssignedIdentityResourceId'))), createObject('type', 'UserAssigned', 'userAssignedIdentities', createObject(format('{0}', parameters('userAssignedIdentityResourceId')), createObject())), null())]",
               "properties": {
                 "azPowerShellVersion": "11.0",
                 "scriptContent": "start-sleep -Seconds 300",
@@ -51985,16 +52004,7 @@
           },
           "diagnosticSettings": "[if(parameters('enableMonitoring'), createObject('value', createArray(createObject('workspaceResourceId', reference('monitoring').outputs.logAnalyticsWorkspaceId.value))), createObject('value', createArray()))]",
           "connections": {
-            "value": [
-              {
-                "name": "aiservices-connection",
-                "category": "AIServices",
-                "target": "[reference('openai').outputs.endpoint.value]",
-                "connectionProperties": {
-                  "authType": "AAD"
-                }
-              }
-            ]
+            "value": []
           },
           "roleAssignments": {
             "value": "[concat(createArray(createObject('roleDefinitionIdOrName', 'Contributor', 'principalId', reference('managedIdentityModule').outputs.principalId.value, 'principalType', 'ServicePrincipal')), if(not(empty(parameters('principal').id)), createArray(createObject('roleDefinitionIdOrName', 'Contributor', 'principalId', parameters('principal').id)), createArray()))]"
@@ -54889,7 +54899,6 @@
         "keyvault",
         "managedIdentityModule",
         "monitoring",
-        "openai",
         "storage"
       ]
     },
@@ -61115,9 +61124,9 @@
         }
       },
       "dependsOn": [
+        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').storageQueue)]",
         "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').storageBlob)]",
         "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').storageFile)]",
-        "[format('avmPrivateDnsZones[{0}]', variables('dnsZoneIndex').storageQueue)]",
         "managedIdentityModule",
         "virtualNetwork"
       ]

@@ -121,10 +121,18 @@ resource functionNameDefaultClientKey 'Microsoft.Web/sites/host/functionKeys@201
   ]
 }
 
-resource waitFunctionDeploymentSection 'Microsoft.Resources/deploymentScripts@2020-10-01' = {
+resource waitFunctionDeploymentSection 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
   kind: 'AzurePowerShell'
   name: 'WaitFunctionDeploymentSection'
   location: location
+  identity: !empty(userAssignedIdentityResourceId)
+    ? {
+        type: 'UserAssigned'
+        userAssignedIdentities: {
+          '${userAssignedIdentityResourceId}': {}
+        }
+      }
+    : null
   properties: {
     azPowerShellVersion: '11.0'
     scriptContent: 'start-sleep -Seconds 300'

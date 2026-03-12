@@ -1723,17 +1723,8 @@ module foundryHub 'modules/machine-learning-services/workspace/ml_workspace.bice
     diagnosticSettings: enableMonitoring
       ? [{ workspaceResourceId: monitoring!.outputs.logAnalyticsWorkspaceId }]
       : []
-    // Connect the Hub to the AIServices resource
-    connections: [
-      {
-        name: 'aiservices-connection'
-        category: 'AIServices'
-        target: openai.outputs.endpoint
-        connectionProperties: {
-          authType: 'AAD'
-        }
-      }
-    ]
+    // AI Services connection is created separately below (requires resourceId)
+    connections: []
     roleAssignments: concat(
       [
         {
@@ -1752,6 +1743,23 @@ module foundryHub 'modules/machine-learning-services/workspace/ml_workspace.bice
         : []
     )
   }
+}
+
+// Connect the Foundry Hub to the AIServices resource (standalone to include resourceId)
+resource foundryHubAIServicesConnection 'Microsoft.MachineLearningServices/workspaces/connections@2024-10-01' = {
+  name: '${foundryHubName}/aiservices-connection'
+  properties: {
+    category: 'AIServices'
+    target: openai.outputs.endpoint
+    authType: 'AAD'
+    metadata: {
+      ApiType: 'Azure'
+      ResourceId: openai.outputs.resourceId
+    }
+  }
+  dependsOn: [
+    foundryHub
+  ]
 }
 
 module foundryProject 'modules/machine-learning-services/workspace/ml_workspace.bicep' = {
