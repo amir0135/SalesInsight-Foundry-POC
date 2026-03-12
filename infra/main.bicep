@@ -886,24 +886,8 @@ module postgresDBModule 'br/public:avm/res/db-for-postgre-sql/flexible-server:0.
   }
 }
 
-module pgSqlDelayScript 'br/public:avm/res/resources/deployment-script:0.5.1' = if (databaseType == 'PostgreSQL') {
-  name: take('avm.res.deployment-script.delay.${postgresResourceName}', 64)
-  params: {
-    name: 'delay-for-postgres-${solutionSuffix}'
-    location: resourceGroup().location
-    tags: tags
-    kind: 'AzurePowerShell'
-    enableTelemetry: enableTelemetry
-    scriptContent: 'start-sleep -Seconds 300'
-    azPowerShellVersion: '11.0'
-    timeout: 'PT15M'
-    cleanupPreference: 'Always'
-    retentionInterval: 'PT1H'
-  }
-  dependsOn: [
-    postgresDBModule
-  ]
-}
+// PostgreSQL delay script removed: Azure Policy blocks allowSharedKeyAccess on
+// storage accounts, preventing deployment scripts without managed identity from running.
 
 // Store secrets in a keyvault
 var keyVaultName = 'kv-${solutionSuffix}'
@@ -2033,7 +2017,10 @@ module systemAssignedIdentityRoleAssignments './modules/app/roleassignments.bice
 }
 
 //========== Deployment script to upload data ========== //
-module createIndex 'br/public:avm/res/resources/deployment-script:0.5.1' = if (databaseType == 'PostgreSQL') {
+// NOTE: Deployment scripts require allowSharedKeyAccess on storage accounts.
+// If Azure Policy blocks this, run the database setup post-deployment:
+//   bash scripts/run_create_table_script.sh <baseUrl> <resourceGroup> <pgFqdn> <managedIdentityName>
+module createIndex 'br/public:avm/res/resources/deployment-script:0.5.1' = if (false && databaseType == 'PostgreSQL') {
   name: take('avm.res.resources.deployment-script.createIndex', 64)
   params: {
     kind: 'AzureCLI'
@@ -2060,7 +2047,7 @@ module createIndex 'br/public:avm/res/resources/deployment-script:0.5.1' = if (d
     tags: tags
     timeout: 'PT30M'
   }
-  dependsOn: [pgSqlDelayScript]
+  dependsOn: [postgresDBModule]
 }
 
 var azureOpenAIModelInfo = string({

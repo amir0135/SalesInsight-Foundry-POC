@@ -109,40 +109,10 @@ module function '../core/host/functions.bicep' = {
   }
 }
 
-resource functionNameDefaultClientKey 'Microsoft.Web/sites/host/functionKeys@2018-11-01' = {
-  name: '${name}/default/clientKey'
-  properties: {
-    name: 'ClientKey'
-    value: clientKey
-  }
-  dependsOn: [
-    function
-    waitFunctionDeploymentSection
-  ]
-}
-
-resource waitFunctionDeploymentSection 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
-  kind: 'AzurePowerShell'
-  name: 'WaitFunctionDeploymentSection'
-  location: location
-  identity: !empty(userAssignedIdentityResourceId)
-    ? {
-        type: 'UserAssigned'
-        userAssignedIdentities: {
-          '${userAssignedIdentityResourceId}': {}
-        }
-      }
-    : null
-  properties: {
-    azPowerShellVersion: '11.0'
-    scriptContent: 'start-sleep -Seconds 300'
-    cleanupPreference: 'Always'
-    retentionInterval: 'PT1H'
-  }
-  dependsOn: [
-    function
-  ]
-}
+// Function key and deployment script removed: Azure Policy on subscription
+// blocks allowSharedKeyAccess on storage accounts, preventing deployment scripts
+// from running. The function key can be created post-deployment via:
+//   az functionapp keys set -g <rg> -n <funcapp> --key-type functionKeys --key-name ClientKey --key-value <value>
 
 @description('The name of the function app.')
 output functionName string = function.outputs.name
