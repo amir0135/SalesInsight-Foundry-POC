@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "2544388761949352417"
+      "templateHash": "15028948038915104141"
     }
   },
   "parameters": {
@@ -236,7 +236,7 @@
     },
     "azureOpenAIModelCapacity": {
       "type": "int",
-      "defaultValue": 150,
+      "defaultValue": 30,
       "metadata": {
         "description": "Optional. Azure OpenAI Model Capacity - See here for more info  https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/quota."
       }
