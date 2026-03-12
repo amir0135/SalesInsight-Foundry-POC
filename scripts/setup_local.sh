@@ -12,7 +12,7 @@
 #   - azd up completed successfully
 #   - Docker installed (for PostgreSQL container)
 #   - Node.js 18+ and npm installed
-#   - Python 3.11+ with Poetry installed
+#   - Python 3.11+ (Poetry recommended but optional)
 #
 # Usage:
 #   ./scripts/setup_local.sh

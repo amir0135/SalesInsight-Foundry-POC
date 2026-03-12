@@ -176,9 +176,7 @@ git clone https://github.com/amir0135/SalesInsight-Foundry-POC.git
 cd SalesInsight-Foundry-POC
 ./scripts/setup_local.sh
 
-# 3. Install and run
-poetry install
-cd code/frontend && npm install && cd ../..
+# 3. Start all services (auto-installs dependencies)
 ./start_local.sh
 ```
 
@@ -262,6 +260,14 @@ SNOWFLAKE_DATABASE=your-database
 Deployment uses the [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/) with Bicep templates.
 
 > **Before deploying**: Check Azure OpenAI quota availability. See the [quota check guide](./docs/QuotaCheck.md).
+
+### One-Click Deploy
+
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Famir0135%2FSalesInsight-Foundry-POC%2Frefs%2Fheads%2Ffeature%2Ffoundry-migration%2Finfra%2Fmain.json)
+
+During deployment you will choose a **region** and **database type** (PostgreSQL or Cosmos DB). The default model is **GPT-4.1** (version 2025-04-14).
+
+### CLI Deploy
 
 ```bash
 # Provision Azure resources + deploy all services

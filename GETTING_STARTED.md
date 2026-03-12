@@ -6,17 +6,17 @@ The fastest path from zero to chatting with your data.
 
 ## Step 1: Deploy Azure Resources
 
-Provision the required Azure infrastructure first. This creates Azure OpenAI, AI Search, Cosmos DB, Blob Storage, and App Service in your subscription.
+Provision the required Azure infrastructure with one click. This creates Azure OpenAI, AI Search, Cosmos DB (or PostgreSQL), Blob Storage, and App Service in your subscription.
 
 > **Check quota first**: Follow the [quota check guide](docs/QuotaCheck.md) to ensure your subscription has enough Azure OpenAI capacity.
 
-```bash
-az login
-azd auth login
-azd up
-```
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Famir0135%2FSalesInsight-Foundry-POC%2Frefs%2Fheads%2Ffeature%2Ffoundry-migration%2Finfra%2Fmain.json)
 
-You'll be prompted for a region and database type (CosmosDB is the default). Once complete, `azd` outputs the URLs for your deployed services.
+During deployment you will choose a **region** and **database type** (PostgreSQL or Cosmos DB).
+
+> **Note:** The default deployment uses **GPT-4.1** (version 2025-04-14). Ensure this model is available in your chosen region.
+
+When deployment is complete, [set up authentication in Azure App Service](docs/azure_app_service_auth_setup.md).
 
 ---
 
@@ -26,18 +26,16 @@ You'll be prompted for a region and database type (CosmosDB is the default). Onc
 git clone https://github.com/amir0135/SalesInsight-Foundry-POC.git
 cd SalesInsight-Foundry-POC
 
-# Pull Azure config into .env
+# Pull Azure config into .env and install dependencies
 ./scripts/setup_local.sh
 
-# Install dependencies
-poetry install
-cd code/frontend && npm install && cd ../..
-
-# Start all services
+# Start all services (installs/updates deps automatically)
 ./start_local.sh
 ```
 
 Open the **Chat UI** at **http://localhost:5173**.
+
+> `start_local.sh` automatically creates a Python virtual environment, installs Python and Node.js dependencies, starts a local PostgreSQL container, and launches all four services. See [Local Development Guide](docs/LOCAL_DEVELOPMENT.md) for startup flags and troubleshooting.
 
 ---
 

@@ -9,11 +9,11 @@ Detailed setup options, configuration, and troubleshooting for developing locall
 ## Prerequisites
 
 - [Python 3.11+](https://www.python.org)
-- [Node.js 20+](https://nodejs.org)
-- [Poetry](https://python-poetry.org/docs/#installation)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop) (for local PostgreSQL or Docker-based setup)
-- Azure Functions Core Tools: `npm install -g azure-functions-core-tools@4`
+- [Node.js 18+](https://nodejs.org)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop) (for local PostgreSQL)
 - [Azure CLI](https://docs.microsoft.com/cli/azure/install-azure-cli) + [Azure Developer CLI (`azd`)](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd)
+
+> **Poetry** and **Azure Functions Core Tools** are recommended but optional — `start_local.sh` can install dependencies with pip if Poetry is not available, and will install Functions Core Tools via npm if missing.
 
 Or install everything at once:
 
@@ -53,10 +53,19 @@ See [.env.example](../.env.example) for all available settings with descriptions
 ### Standard (recommended for development)
 
 ```bash
-poetry install
-cd code/frontend && npm install && cd ../..
 ./start_local.sh
 ```
+
+> `start_local.sh` automatically creates a virtual environment, installs Python and Node.js dependencies (if changed), starts a PostgreSQL container, and launches all services. No manual `poetry install` or `npm install` needed.
+
+**Startup flags:**
+
+| Flag | Effect |
+|------|--------|
+| *(none)* | Full startup: Azure config refresh + dependency check + all services |
+| `--skip-azure` | Skip Azure credential refresh and storage policy configuration |
+| `--skip-deps` | Skip dependency check (faster restart if deps haven't changed) |
+| `--fast` | Skip both Azure config and dependency check (fastest restart) |
 
 ### Docker (no local Python/Node required)
 
@@ -79,7 +88,7 @@ docker-compose -f docker/docker-compose.local.yml up --build
 | Chat API | http://localhost:5050 | Flask |
 | Admin UI | http://localhost:8501 | Streamlit |
 | Azure Functions | http://localhost:7071 | Azure Functions Core Tools |
-| PostgreSQL | localhost:5432 | Docker container (chat history) |
+| PostgreSQL | localhost:5433 | Docker container (sales data + chat history) |
 
 To stop all services:
 
@@ -117,7 +126,7 @@ npm install -g azure-functions-core-tools@4
 
 ### PostgreSQL container issues
 ```bash
-docker stop database-postgres && docker rm database-postgres
+docker stop salesinsight-postgres && docker rm salesinsight-postgres
 # Restart — start_local.sh will recreate it:
 ./start_local.sh
 ```
@@ -133,7 +142,7 @@ docker stop database-postgres && docker rm database-postgres
 
 | Resource | Purpose |
 |----------|---------|
-| Azure OpenAI | GPT-4o + embedding models |
+| Azure OpenAI | GPT-4.1 + embedding models |
 | Azure AI Search | Document indexing and vector search |
 | Azure Blob Storage | Document staging and configuration |
 | Azure Cosmos DB | Conversation history (default) |

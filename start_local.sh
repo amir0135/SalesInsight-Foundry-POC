@@ -62,7 +62,7 @@ echo -e "${BLUE}[Preflight] Checking setup...${NC}"
 # Check if .env exists
 if [ ! -f ".env" ]; then
     echo -e "${RED}✗ .env file not found.${NC}"
-    echo -e "${YELLOW}  Run ./scripts/setup_local.sh first, or copy .env.sample to .env${NC}"
+    echo -e "${YELLOW}  Run ./scripts/setup_local.sh first, or copy .env.example to .env${NC}"
     exit 1
 fi
 
@@ -869,7 +869,7 @@ echo -e "${GREEN}║${NC} Chat UI (Frontend):  ${BLUE}http://localhost:5173${NC}
 echo -e "${GREEN}║${NC} Chat API (Backend):  ${BLUE}http://localhost:5050${NC}                ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC} Admin UI:            ${BLUE}http://localhost:8501${NC}                ${GREEN}║${NC}"
 echo -e "${GREEN}║${NC} Azure Functions:     ${BLUE}http://localhost:7071${NC}                ${GREEN}║${NC}"
-echo -e "${GREEN}║${NC} PostgreSQL:          localhost:5432 (database_test)     ${GREEN}║${NC}"
+echo -e "${GREEN}║${NC} PostgreSQL:          localhost:5433 (database_test)     ${GREEN}║${NC}"
 echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${YELLOW}Logs:${NC}"

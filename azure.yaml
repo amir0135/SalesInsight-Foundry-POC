@@ -17,7 +17,7 @@ hooks:
       shell: pwsh
       run: ./scripts/parse_env.ps1
 services:
-  web-docker:
+  web:
     project: ./code
     language: py
     host: appservice
@@ -38,7 +38,7 @@ services:
           interactive: true
           continueOnError: false
 
-  adminweb-docker:
+  adminweb:
     project: ./code/backend
     language: py
     host: appservice
@@ -49,12 +49,12 @@ services:
       prepackage:
         windows:
           shell: pwsh
-          run: poetry install; poetry export -o requirements.txt
+          run: poetry install; poetry export --without-hashes -o requirements.txt
         posix:
           shell: sh
-          run: poetry install; poetry export -o requirements.txt
+          run: poetry install; poetry export --without-hashes -o requirements.txt
 
-  function-docker:
+  function:
     project: ./code/backend/batch
     language: py
     host: appservice
