@@ -676,7 +676,10 @@ if [ "$DOCKER_AVAILABLE" = "true" ] && ! docker ps | grep -q "$POSTGRES_CONTAINE
     echo -e "${YELLOW}Starting PostgreSQL container (for Sales Database testing)...${NC}"
     
     # Try to start existing container first, then create new one
-    if ! docker start "$POSTGRES_CONTAINER" 2>/dev/null; then
+    if docker start "$POSTGRES_CONTAINER" 2>/dev/null; then
+        echo -e "${YELLOW}  Waiting for PostgreSQL to be ready...${NC}"
+        sleep 3
+    else
         docker run -d \
             --name "$POSTGRES_CONTAINER" \
             -e POSTGRES_USER=$POSTGRES_USER \
@@ -751,9 +754,10 @@ if [ "$DOCKER_AVAILABLE" = "true" ]; then
     echo -e "${BLUE}[Chat History] Setting up local chat history database...${NC}"
 
     # Create the chathistory database if it doesn't exist
-    docker exec "$POSTGRES_CONTAINER" psql -U $POSTGRES_USER -tc \
-        "SELECT 1 FROM pg_database WHERE datname = 'chathistory'" 2>/dev/null | grep -q 1 || \
-        docker exec "$POSTGRES_CONTAINER" psql -U $POSTGRES_USER -c "CREATE DATABASE chathistory;" 2>/dev/null
+    if ! docker exec "$POSTGRES_CONTAINER" psql -U $POSTGRES_USER -tc \
+        "SELECT 1 FROM pg_database WHERE datname = 'chathistory'" 2>/dev/null | grep -q 1; then
+        docker exec "$POSTGRES_CONTAINER" psql -U $POSTGRES_USER -c "CREATE DATABASE chathistory;" 2>/dev/null || true
+    fi
 
     # Create chat history tables (matching PostgresConversationClient schema)
     docker exec "$POSTGRES_CONTAINER" psql -U $POSTGRES_USER -d chathistory -c "
