@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.37.4.10188",
-      "templateHash": "15028948038915104141"
+      "templateHash": "15187246861951767134"
     }
   },
   "parameters": {
@@ -64,7 +64,7 @@
     },
     "databaseType": {
       "type": "string",
-      "defaultValue": "PostgreSQL",
+      "defaultValue": "CosmosDB",
       "allowedValues": [
         "PostgreSQL",
         "CosmosDB"
@@ -37874,7 +37874,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.37.4.10188",
-              "templateHash": "13152625210460832621"
+              "templateHash": "13824250462163071493"
             }
           },
           "parameters": {
@@ -38042,6 +38042,18 @@
             "kind": "[if(variables('useDocker'), 'functionapp,linux,container', 'functionapp,linux')]"
           },
           "resources": {
+            "functionNameDefaultClientKey": {
+              "type": "Microsoft.Web/sites/host/functionKeys",
+              "apiVersion": "2018-11-01",
+              "name": "[format('{0}/default/clientKey', parameters('name'))]",
+              "properties": {
+                "name": "ClientKey",
+                "value": "[parameters('clientKey')]"
+              },
+              "dependsOn": [
+                "function"
+              ]
+            },
             "function": {
               "type": "Microsoft.Resources/deployments",
               "apiVersion": "2022-09-01",

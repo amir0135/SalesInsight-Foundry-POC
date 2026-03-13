@@ -6,51 +6,19 @@ The fastest path from zero to chatting with your data.
 
 ## Step 1: Deploy Azure Resources
 
-Provision the required Azure infrastructure with one click. This creates Azure OpenAI, AI Search, Cosmos DB (or PostgreSQL), Blob Storage, and App Service in your subscription.
+Provision the required Azure infrastructure with one click. This creates Azure OpenAI, AI Search, Cosmos DB, Blob Storage, and App Service in your subscription.
 
 > **Check quota first**: Follow the [quota check guide](docs/QuotaCheck.md) to ensure your subscription has enough Azure OpenAI capacity.
 
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Famir0135%2FSalesInsight-Foundry-POC%2Frefs%2Fheads%2Ffeature%2Ffoundry-migration%2Finfra%2Fmain.json)
 
-During deployment you will choose a **region** and **database type** (PostgreSQL or Cosmos DB).
+During deployment:
+- **Region**: Choose one of the [supported regions](#supported-azure-regions) listed in the README
+- **Database Type**: Leave as **CosmosDB** (recommended for this POC)
 
 > **Note:** The default deployment uses **GPT-4.1** (version 2025-04-14). Ensure this model is available in your chosen region.
 
-When deployment is complete, run these **post-deployment steps**:
-
-### Post-Deployment Setup
-
-**1. Set up authentication** — [Azure App Service auth guide](docs/azure_app_service_auth_setup.md)
-
-**2. Create the Function App key** — The deployment does not create a function key automatically. Run:
-
-```bash
-# Get the function key value from Key Vault
-FUNCTION_KEY=$(az keyvault secret show \
-  --vault-name <your-keyvault-name> \
-  --name FUNCTION-KEY \
-  --query value -o tsv)
-
-# Set the key on the Function App
-az functionapp keys set \
-  -g <your-resource-group> \
-  -n <your-function-app-name> \
-  --key-type functionKeys \
-  --key-name ClientKey \
-  --key-value "$FUNCTION_KEY"
-```
-
-**3. Set up the PostgreSQL database** (only if you chose PostgreSQL as database type):
-
-```bash
-bash scripts/run_create_table_script.sh \
-  <app-base-url> \
-  <your-resource-group> \
-  <postgres-fqdn> \
-  <managed-identity-name>
-```
-
-> **Tip:** All resource names follow the pattern `<resource-prefix>-cwyd<solutionUniqueText>`. You can find them in the Azure Portal under your resource group.
+When deployment is complete, [set up authentication in Azure App Service](docs/azure_app_service_auth_setup.md).
 
 ---
 
