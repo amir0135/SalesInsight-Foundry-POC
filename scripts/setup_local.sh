@@ -107,38 +107,115 @@ echo -e "${GREEN}✓ Logged in to Azure subscription: $SUBSCRIPTION${NC}"
 echo ""
 
 # =============================================================================
-# Step 3: Get Azure Environment Variables from azd
+# Step 3: Get Azure Environment Variables (azd or resource group discovery)
 # =============================================================================
-echo -e "${BLUE}[3/7] Retrieving Azure configuration from azd...${NC}"
+echo -e "${BLUE}[3/7] Retrieving Azure configuration...${NC}"
 
-# Check if azd environment exists
-if ! azd env list 2>/dev/null | grep -q "true"; then
-    echo -e "${RED}✗ No azd environment found. Please run 'azd up' first to deploy to Azure.${NC}"
-    echo -e "${YELLOW}  After deployment, run this script again.${NC}"
+USE_AZD=false
+
+# Try azd first
+if command -v azd &> /dev/null && azd env list 2>/dev/null | grep -q "true"; then
+    USE_AZD=true
+    AZD_ENV=$(azd env list --output json 2>/dev/null | python3 -c "import sys,json; envs=json.load(sys.stdin); print(next((e['Name'] for e in envs if e.get('IsDefault')), ''))" 2>/dev/null || echo "")
+    echo -e "${GREEN}✓ Found azd environment: ${AZD_ENV:-default}${NC}"
+    echo "Loading environment variables from azd..."
+    eval "$(azd env get-values 2>/dev/null | grep -E '^[A-Z]' | sed 's/^/export /')"
+    STORAGE_ACCOUNT="${AZURE_BLOB_ACCOUNT_NAME:-$AZURE_STORAGE_ACCOUNT}"
+else
+    echo -e "${YELLOW}No azd environment found. Discovering resources from Azure resource group...${NC}"
+    echo ""
+    echo -e "If you deployed via the ${GREEN}Deploy to Azure${NC} button, enter the resource group name."
+    echo -n "Resource group name: "
+    read -r RG_NAME
+
+    if [ -z "$RG_NAME" ]; then
+        echo -e "${RED}✗ No resource group specified. Exiting.${NC}"
+        exit 1
+    fi
+
+    # Verify the resource group exists
+    if ! az group show --name "$RG_NAME" &> /dev/null; then
+        echo -e "${RED}✗ Resource group '$RG_NAME' not found. Check the name and try again.${NC}"
+        exit 1
+    fi
+
+    export AZURE_RESOURCE_GROUP="$RG_NAME"
+    export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+
+    echo "Discovering resources in '$RG_NAME'..."
+
+    # Storage account
+    STORAGE_ACCOUNT=$(az storage account list -g "$RG_NAME" --query "[0].name" -o tsv 2>/dev/null || echo "")
+    export AZURE_BLOB_ACCOUNT_NAME="$STORAGE_ACCOUNT"
+
+    # OpenAI / AI Services (kind=AIServices or kind=OpenAI)
+    OAI_NAME=$(az cognitiveservices account list -g "$RG_NAME" --query "[?kind=='AIServices' || kind=='OpenAI'] | [0].name" -o tsv 2>/dev/null || echo "")
+    export AZURE_OPENAI_RESOURCE="$OAI_NAME"
+
+    # Get the first deployment's model info
+    if [ -n "$OAI_NAME" ]; then
+        MODEL_INFO=$(az cognitiveservices account deployment list -g "$RG_NAME" -n "$OAI_NAME" --query "[?properties.model.format=='OpenAI' && !contains(properties.model.name, 'embedding')] | [0].{name:name, model:properties.model.name, version:properties.model.version}" -o json 2>/dev/null || echo "{}")
+        export AZURE_OPENAI_MODEL=$(echo "$MODEL_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('name',''))" 2>/dev/null || echo "")
+        export AZURE_OPENAI_MODEL_NAME=$(echo "$MODEL_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('model',''))" 2>/dev/null || echo "")
+        export AZURE_OPENAI_MODEL_VERSION=$(echo "$MODEL_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version',''))" 2>/dev/null || echo "")
+
+        EMBED_INFO=$(az cognitiveservices account deployment list -g "$RG_NAME" -n "$OAI_NAME" --query "[?contains(properties.model.name, 'embedding')] | [0].{name:name, model:properties.model.name, version:properties.model.version}" -o json 2>/dev/null || echo "{}")
+        export AZURE_OPENAI_EMBEDDING_MODEL=$(echo "$EMBED_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('name',''))" 2>/dev/null || echo "")
+        export AZURE_OPENAI_EMBEDDING_MODEL_NAME=$(echo "$EMBED_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('model',''))" 2>/dev/null || echo "")
+        export AZURE_OPENAI_EMBEDDING_MODEL_VERSION=$(echo "$EMBED_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version',''))" 2>/dev/null || echo "")
+    fi
+
+    # Document Intelligence
+    DI_NAME=$(az cognitiveservices account list -g "$RG_NAME" --query "[?kind=='FormRecognizer'] | [0].name" -o tsv 2>/dev/null || echo "")
+    if [ -n "$DI_NAME" ]; then
+        export AZURE_FORM_RECOGNIZER_ENDPOINT=$(az cognitiveservices account show -g "$RG_NAME" -n "$DI_NAME" --query "properties.endpoint" -o tsv 2>/dev/null || echo "")
+    fi
+
+    # Content Safety
+    CS_NAME=$(az cognitiveservices account list -g "$RG_NAME" --query "[?kind=='ContentSafety'] | [0].name" -o tsv 2>/dev/null || echo "")
+    if [ -n "$CS_NAME" ]; then
+        export AZURE_CONTENT_SAFETY_ENDPOINT=$(az cognitiveservices account show -g "$RG_NAME" -n "$CS_NAME" --query "properties.endpoint" -o tsv 2>/dev/null || echo "")
+    fi
+
+    # Key Vault
+    KV_NAME=$(az keyvault list -g "$RG_NAME" --query "[0].name" -o tsv 2>/dev/null || echo "")
+    if [ -n "$KV_NAME" ]; then
+        export AZURE_KEY_VAULT_ENDPOINT="https://${KV_NAME}.vault.azure.net/"
+    fi
+
+    # Speech
+    SPEECH_NAME=$(az cognitiveservices account list -g "$RG_NAME" --query "[?kind=='SpeechServices'] | [0].name" -o tsv 2>/dev/null || echo "")
+    if [ -n "$SPEECH_NAME" ]; then
+        export AZURE_SPEECH_SERVICE_NAME="$SPEECH_NAME"
+        export AZURE_SPEECH_SERVICE_REGION=$(az cognitiveservices account show -g "$RG_NAME" -n "$SPEECH_NAME" --query "location" -o tsv 2>/dev/null || echo "")
+    fi
+
+    # Managed Identity
+    MI_CLIENT_ID=$(az identity list -g "$RG_NAME" --query "[0].clientId" -o tsv 2>/dev/null || echo "")
+    export AZURE_CLIENT_ID="$MI_CLIENT_ID"
+
+    # Cosmos DB
+    COSMOS_NAME=$(az cosmosdb list -g "$RG_NAME" --query "[0].name" -o tsv 2>/dev/null || echo "")
+    if [ -n "$COSMOS_NAME" ]; then
+        export DATABASE_TYPE="CosmosDB"
+        export AZURE_COSMOSDB_ACCOUNT_NAME="$COSMOS_NAME"
+    else
+        export DATABASE_TYPE="PostgreSQL"
+    fi
+
+    # AI Search
+    SEARCH_NAME=$(az search service list -g "$RG_NAME" --query "[0].name" -o tsv 2>/dev/null || echo "")
+    if [ -n "$SEARCH_NAME" ]; then
+        export AZURE_SEARCH_SERVICE="https://${SEARCH_NAME}.search.windows.net"
+        export AZURE_SEARCH_INDEX="${SEARCH_NAME}-index"
+    fi
+fi
+
+if [ -z "$STORAGE_ACCOUNT" ]; then
+    echo -e "${RED}✗ Could not retrieve Azure configuration. Verify your deployment completed successfully.${NC}"
     exit 1
 fi
 
-# Get environment name
-AZD_ENV=$(azd env list --output json 2>/dev/null | python3 -c "import sys,json; envs=json.load(sys.stdin); print(next((e['Name'] for e in envs if e.get('IsDefault')), ''))" 2>/dev/null || echo "")
-
-if [ -z "$AZD_ENV" ]; then
-    echo -e "${YELLOW}Could not detect azd environment. Using environment variables from azd env get-values...${NC}"
-fi
-
-echo -e "${GREEN}✓ Found azd environment: ${AZD_ENV:-default}${NC}"
-
-# Export azd environment variables
-echo "Loading environment variables from Azure deployment..."
-eval "$(azd env get-values 2>/dev/null | grep -E '^[A-Z]' | sed 's/^/export /')"
-
-# Verify key variables
-if [ -z "$AZURE_STORAGE_ACCOUNT" ] && [ -z "$AZURE_BLOB_ACCOUNT_NAME" ]; then
-    echo -e "${RED}✗ Could not retrieve Azure configuration. Make sure 'azd up' completed successfully.${NC}"
-    exit 1
-fi
-
-# Use AZURE_STORAGE_ACCOUNT if AZURE_BLOB_ACCOUNT_NAME is not set
-STORAGE_ACCOUNT="${AZURE_BLOB_ACCOUNT_NAME:-$AZURE_STORAGE_ACCOUNT}"
 echo -e "${GREEN}✓ Storage Account: $STORAGE_ACCOUNT${NC}"
 echo ""
 

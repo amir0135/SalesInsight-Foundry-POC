@@ -35,6 +35,8 @@ cd SalesInsight-Foundry-POC
 ./start_local.sh
 ```
 
+The setup script will ask you for the **resource group name** you chose in Step 1. It discovers all deployed resources and generates a `.env` file automatically.
+
 Open the **Chat UI** at **http://localhost:5173**.
 
 > `start_local.sh` automatically creates a Python virtual environment, installs Python and Node.js dependencies, starts a local PostgreSQL container, and launches all four services. See [Local Development Guide](docs/LOCAL_DEVELOPMENT.md) for startup flags and troubleshooting.
