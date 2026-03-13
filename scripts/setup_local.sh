@@ -124,99 +124,136 @@ if command -v azd &> /dev/null && azd env list 2>/dev/null | grep -q "true"; the
 else
     echo -e "${YELLOW}No azd environment found. Discovering resources from Azure resource group...${NC}"
     echo ""
-    echo -e "If you deployed via the ${GREEN}Deploy to Azure${NC} button, enter the resource group name."
-    echo -n "Resource group name: "
+
+    # List available resource groups
+    echo -e "Your Azure resource groups:"
+    echo ""
+    az group list --query "[].{Name:name, Location:location}" -o table 2>/dev/null
+    echo ""
+    echo "Options:"
+    echo "  1) Enter an existing resource group name"
+    echo "  2) Type 'new' to create a new resource group"
+    echo "  3) Press Enter to skip Azure config (local-only dev)"
+    echo ""
+    echo -n "Resource group name (or 'new' / Enter to skip): "
     read -r RG_NAME
 
     if [ -z "$RG_NAME" ]; then
-        echo -e "${RED}✗ No resource group specified. Exiting.${NC}"
-        exit 1
-    fi
-
-    # Verify the resource group exists
-    if ! az group show --name "$RG_NAME" &> /dev/null; then
-        echo -e "${RED}✗ Resource group '$RG_NAME' not found. Check the name and try again.${NC}"
-        exit 1
-    fi
-
-    export AZURE_RESOURCE_GROUP="$RG_NAME"
-    export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-
-    echo "Discovering resources in '$RG_NAME'..."
-
-    # Storage account
-    STORAGE_ACCOUNT=$(az storage account list -g "$RG_NAME" --query "[0].name" -o tsv 2>/dev/null || echo "")
-    export AZURE_BLOB_ACCOUNT_NAME="$STORAGE_ACCOUNT"
-
-    # OpenAI / AI Services (kind=AIServices or kind=OpenAI)
-    OAI_NAME=$(az cognitiveservices account list -g "$RG_NAME" --query "[?kind=='AIServices' || kind=='OpenAI'] | [0].name" -o tsv 2>/dev/null || echo "")
-    export AZURE_OPENAI_RESOURCE="$OAI_NAME"
-
-    # Get the first deployment's model info
-    if [ -n "$OAI_NAME" ]; then
-        MODEL_INFO=$(az cognitiveservices account deployment list -g "$RG_NAME" -n "$OAI_NAME" --query "[?properties.model.format=='OpenAI' && !contains(properties.model.name, 'embedding')] | [0].{name:name, model:properties.model.name, version:properties.model.version}" -o json 2>/dev/null || echo "{}")
-        export AZURE_OPENAI_MODEL=$(echo "$MODEL_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('name',''))" 2>/dev/null || echo "")
-        export AZURE_OPENAI_MODEL_NAME=$(echo "$MODEL_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('model',''))" 2>/dev/null || echo "")
-        export AZURE_OPENAI_MODEL_VERSION=$(echo "$MODEL_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version',''))" 2>/dev/null || echo "")
-
-        EMBED_INFO=$(az cognitiveservices account deployment list -g "$RG_NAME" -n "$OAI_NAME" --query "[?contains(properties.model.name, 'embedding')] | [0].{name:name, model:properties.model.name, version:properties.model.version}" -o json 2>/dev/null || echo "{}")
-        export AZURE_OPENAI_EMBEDDING_MODEL=$(echo "$EMBED_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('name',''))" 2>/dev/null || echo "")
-        export AZURE_OPENAI_EMBEDDING_MODEL_NAME=$(echo "$EMBED_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('model',''))" 2>/dev/null || echo "")
-        export AZURE_OPENAI_EMBEDDING_MODEL_VERSION=$(echo "$EMBED_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version',''))" 2>/dev/null || echo "")
-    fi
-
-    # Document Intelligence
-    DI_NAME=$(az cognitiveservices account list -g "$RG_NAME" --query "[?kind=='FormRecognizer'] | [0].name" -o tsv 2>/dev/null || echo "")
-    if [ -n "$DI_NAME" ]; then
-        export AZURE_FORM_RECOGNIZER_ENDPOINT=$(az cognitiveservices account show -g "$RG_NAME" -n "$DI_NAME" --query "properties.endpoint" -o tsv 2>/dev/null || echo "")
-    fi
-
-    # Content Safety
-    CS_NAME=$(az cognitiveservices account list -g "$RG_NAME" --query "[?kind=='ContentSafety'] | [0].name" -o tsv 2>/dev/null || echo "")
-    if [ -n "$CS_NAME" ]; then
-        export AZURE_CONTENT_SAFETY_ENDPOINT=$(az cognitiveservices account show -g "$RG_NAME" -n "$CS_NAME" --query "properties.endpoint" -o tsv 2>/dev/null || echo "")
-    fi
-
-    # Key Vault
-    KV_NAME=$(az keyvault list -g "$RG_NAME" --query "[0].name" -o tsv 2>/dev/null || echo "")
-    if [ -n "$KV_NAME" ]; then
-        export AZURE_KEY_VAULT_ENDPOINT="https://${KV_NAME}.vault.azure.net/"
-    fi
-
-    # Speech
-    SPEECH_NAME=$(az cognitiveservices account list -g "$RG_NAME" --query "[?kind=='SpeechServices'] | [0].name" -o tsv 2>/dev/null || echo "")
-    if [ -n "$SPEECH_NAME" ]; then
-        export AZURE_SPEECH_SERVICE_NAME="$SPEECH_NAME"
-        export AZURE_SPEECH_SERVICE_REGION=$(az cognitiveservices account show -g "$RG_NAME" -n "$SPEECH_NAME" --query "location" -o tsv 2>/dev/null || echo "")
-    fi
-
-    # Managed Identity
-    MI_CLIENT_ID=$(az identity list -g "$RG_NAME" --query "[0].clientId" -o tsv 2>/dev/null || echo "")
-    export AZURE_CLIENT_ID="$MI_CLIENT_ID"
-
-    # Cosmos DB
-    COSMOS_NAME=$(az cosmosdb list -g "$RG_NAME" --query "[0].name" -o tsv 2>/dev/null || echo "")
-    if [ -n "$COSMOS_NAME" ]; then
-        export DATABASE_TYPE="CosmosDB"
-        export AZURE_COSMOSDB_ACCOUNT_NAME="$COSMOS_NAME"
+        echo -e "${YELLOW}⚠ Skipping Azure config. A minimal .env will be generated.${NC}"
+        echo -e "${YELLOW}  You can re-run this script later after deploying to Azure.${NC}"
+        SKIP_AZURE=true
+    elif [ "$RG_NAME" = "new" ]; then
+        echo -n "New resource group name: "
+        read -r NEW_RG_NAME
+        if [ -z "$NEW_RG_NAME" ]; then
+            echo -e "${RED}✗ No name provided. Exiting.${NC}"
+            exit 1
+        fi
+        echo ""
+        echo "Available regions: australiaeast, eastus2, japaneast, uksouth"
+        echo -n "Region [uksouth]: "
+        read -r RG_LOCATION
+        RG_LOCATION="${RG_LOCATION:-uksouth}"
+        echo "Creating resource group '$NEW_RG_NAME' in '$RG_LOCATION'..."
+        az group create --name "$NEW_RG_NAME" --location "$RG_LOCATION" -o none
+        echo -e "${GREEN}✓ Resource group '$NEW_RG_NAME' created${NC}"
+        echo ""
+        echo -e "${YELLOW}The resource group is empty. Deploy Azure resources using the Deploy to Azure button:${NC}"
+        echo -e "${BLUE}  https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Famir0135%2FSalesInsight-Foundry-POC%2Frefs%2Fheads%2Ffeature%2Ffoundry-migration%2Finfra%2Fmain.json${NC}"
+        echo ""
+        echo -e "Select '${GREEN}${NEW_RG_NAME}${NC}' as the resource group during deployment."
+        echo -e "After deployment completes, re-run: ${YELLOW}./scripts/setup_local.sh${NC}"
+        echo ""
+        echo -e "${YELLOW}⚠ Skipping Azure config for now. A minimal .env will be generated.${NC}"
+        SKIP_AZURE=true
     else
-        export DATABASE_TYPE="PostgreSQL"
-    fi
+        # Verify the resource group exists
+        if ! az group show --name "$RG_NAME" &> /dev/null; then
+            echo -e "${RED}✗ Resource group '$RG_NAME' not found. Check the name and try again.${NC}"
+            exit 1
+        fi
 
-    # AI Search
-    SEARCH_NAME=$(az search service list -g "$RG_NAME" --query "[0].name" -o tsv 2>/dev/null || echo "")
-    if [ -n "$SEARCH_NAME" ]; then
-        export AZURE_SEARCH_SERVICE="https://${SEARCH_NAME}.search.windows.net"
-        export AZURE_SEARCH_INDEX="${SEARCH_NAME}-index"
+        export AZURE_RESOURCE_GROUP="$RG_NAME"
+        export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+
+        echo "Discovering resources in '$RG_NAME'..."
+
+        # Storage account
+        STORAGE_ACCOUNT=$(az storage account list -g "$RG_NAME" --query "[0].name" -o tsv 2>/dev/null || echo "")
+        export AZURE_BLOB_ACCOUNT_NAME="$STORAGE_ACCOUNT"
+
+        # OpenAI / AI Services (kind=AIServices or kind=OpenAI)
+        OAI_NAME=$(az cognitiveservices account list -g "$RG_NAME" --query "[?kind=='AIServices' || kind=='OpenAI'] | [0].name" -o tsv 2>/dev/null || echo "")
+        export AZURE_OPENAI_RESOURCE="$OAI_NAME"
+
+        # Get the first deployment's model info
+        if [ -n "$OAI_NAME" ]; then
+            MODEL_INFO=$(az cognitiveservices account deployment list -g "$RG_NAME" -n "$OAI_NAME" --query "[?properties.model.format=='OpenAI' && !contains(properties.model.name, 'embedding')] | [0].{name:name, model:properties.model.name, version:properties.model.version}" -o json 2>/dev/null || echo "{}")
+            export AZURE_OPENAI_MODEL=$(echo "$MODEL_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('name',''))" 2>/dev/null || echo "")
+            export AZURE_OPENAI_MODEL_NAME=$(echo "$MODEL_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('model',''))" 2>/dev/null || echo "")
+            export AZURE_OPENAI_MODEL_VERSION=$(echo "$MODEL_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version',''))" 2>/dev/null || echo "")
+
+            EMBED_INFO=$(az cognitiveservices account deployment list -g "$RG_NAME" -n "$OAI_NAME" --query "[?contains(properties.model.name, 'embedding')] | [0].{name:name, model:properties.model.name, version:properties.model.version}" -o json 2>/dev/null || echo "{}")
+            export AZURE_OPENAI_EMBEDDING_MODEL=$(echo "$EMBED_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('name',''))" 2>/dev/null || echo "")
+            export AZURE_OPENAI_EMBEDDING_MODEL_NAME=$(echo "$EMBED_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('model',''))" 2>/dev/null || echo "")
+            export AZURE_OPENAI_EMBEDDING_MODEL_VERSION=$(echo "$EMBED_INFO" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version',''))" 2>/dev/null || echo "")
+        fi
+
+        # Document Intelligence
+        DI_NAME=$(az cognitiveservices account list -g "$RG_NAME" --query "[?kind=='FormRecognizer'] | [0].name" -o tsv 2>/dev/null || echo "")
+        if [ -n "$DI_NAME" ]; then
+            export AZURE_FORM_RECOGNIZER_ENDPOINT=$(az cognitiveservices account show -g "$RG_NAME" -n "$DI_NAME" --query "properties.endpoint" -o tsv 2>/dev/null || echo "")
+        fi
+
+        # Content Safety
+        CS_NAME=$(az cognitiveservices account list -g "$RG_NAME" --query "[?kind=='ContentSafety'] | [0].name" -o tsv 2>/dev/null || echo "")
+        if [ -n "$CS_NAME" ]; then
+            export AZURE_CONTENT_SAFETY_ENDPOINT=$(az cognitiveservices account show -g "$RG_NAME" -n "$CS_NAME" --query "properties.endpoint" -o tsv 2>/dev/null || echo "")
+        fi
+
+        # Key Vault
+        KV_NAME=$(az keyvault list -g "$RG_NAME" --query "[0].name" -o tsv 2>/dev/null || echo "")
+        if [ -n "$KV_NAME" ]; then
+            export AZURE_KEY_VAULT_ENDPOINT="https://${KV_NAME}.vault.azure.net/"
+        fi
+
+        # Speech
+        SPEECH_NAME=$(az cognitiveservices account list -g "$RG_NAME" --query "[?kind=='SpeechServices'] | [0].name" -o tsv 2>/dev/null || echo "")
+        if [ -n "$SPEECH_NAME" ]; then
+            export AZURE_SPEECH_SERVICE_NAME="$SPEECH_NAME"
+            export AZURE_SPEECH_SERVICE_REGION=$(az cognitiveservices account show -g "$RG_NAME" -n "$SPEECH_NAME" --query "location" -o tsv 2>/dev/null || echo "")
+        fi
+
+        # Managed Identity
+        MI_CLIENT_ID=$(az identity list -g "$RG_NAME" --query "[0].clientId" -o tsv 2>/dev/null || echo "")
+        export AZURE_CLIENT_ID="$MI_CLIENT_ID"
+
+        # Cosmos DB
+        COSMOS_NAME=$(az cosmosdb list -g "$RG_NAME" --query "[0].name" -o tsv 2>/dev/null || echo "")
+        if [ -n "$COSMOS_NAME" ]; then
+            export DATABASE_TYPE="CosmosDB"
+            export AZURE_COSMOSDB_ACCOUNT_NAME="$COSMOS_NAME"
+        else
+            export DATABASE_TYPE="PostgreSQL"
+        fi
+
+        # AI Search
+        SEARCH_NAME=$(az search service list -g "$RG_NAME" --query "[0].name" -o tsv 2>/dev/null || echo "")
+        if [ -n "$SEARCH_NAME" ]; then
+            export AZURE_SEARCH_SERVICE="https://${SEARCH_NAME}.search.windows.net"
+            export AZURE_SEARCH_INDEX="${SEARCH_NAME}-index"
+        fi
     fi
 fi
 
-if [ -z "$STORAGE_ACCOUNT" ]; then
+if [ "$SKIP_AZURE" != "true" ] && [ -z "$STORAGE_ACCOUNT" ]; then
     echo -e "${RED}✗ Could not retrieve Azure configuration. Verify your deployment completed successfully.${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✓ Storage Account: $STORAGE_ACCOUNT${NC}"
+if [ -n "$STORAGE_ACCOUNT" ]; then
+    echo -e "${GREEN}✓ Storage Account: $STORAGE_ACCOUNT${NC}"
+fi
 echo ""
 
 # =============================================================================
