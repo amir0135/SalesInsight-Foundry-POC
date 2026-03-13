@@ -664,8 +664,15 @@ POSTGRES_PORT=5433
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=postgres
 POSTGRES_DB=database_test
+DOCKER_AVAILABLE=true
 
-if ! docker ps | grep -q "$POSTGRES_CONTAINER"; then
+if ! docker info &>/dev/null; then
+    echo -e "${YELLOW}⚠ Docker is not running. Skipping PostgreSQL container and chat history setup.${NC}"
+    echo -e "${YELLOW}  Start Docker Desktop and re-run to enable local database features.${NC}"
+    DOCKER_AVAILABLE=false
+fi
+
+if [ "$DOCKER_AVAILABLE" = "true" ] && ! docker ps | grep -q "$POSTGRES_CONTAINER"; then
     echo -e "${YELLOW}Starting PostgreSQL container (for Sales Database testing)...${NC}"
     
     # Try to start existing container first, then create new one
@@ -733,56 +740,58 @@ if ! docker ps | grep -q "$POSTGRES_CONTAINER"; then
         fi
     fi
     echo -e "${GREEN}✓ PostgreSQL container started${NC}"
-else
+elif [ "$DOCKER_AVAILABLE" = "true" ]; then
     echo -e "${GREEN}✓ PostgreSQL container already running${NC}"
 fi
 
 # =============================================================================
 # Create Chat History Tables in Local PostgreSQL
 # =============================================================================
-echo -e "${BLUE}[Chat History] Setting up local chat history database...${NC}"
+if [ "$DOCKER_AVAILABLE" = "true" ]; then
+    echo -e "${BLUE}[Chat History] Setting up local chat history database...${NC}"
 
-# Create the chathistory database if it doesn't exist
-docker exec "$POSTGRES_CONTAINER" psql -U $POSTGRES_USER -tc \
-    "SELECT 1 FROM pg_database WHERE datname = 'chathistory'" 2>/dev/null | grep -q 1 || \
-    docker exec "$POSTGRES_CONTAINER" psql -U $POSTGRES_USER -c "CREATE DATABASE chathistory;" 2>/dev/null
+    # Create the chathistory database if it doesn't exist
+    docker exec "$POSTGRES_CONTAINER" psql -U $POSTGRES_USER -tc \
+        "SELECT 1 FROM pg_database WHERE datname = 'chathistory'" 2>/dev/null | grep -q 1 || \
+        docker exec "$POSTGRES_CONTAINER" psql -U $POSTGRES_USER -c "CREATE DATABASE chathistory;" 2>/dev/null
 
-# Create chat history tables (matching PostgresConversationClient schema)
-docker exec "$POSTGRES_CONTAINER" psql -U $POSTGRES_USER -d chathistory -c "
-    CREATE TABLE IF NOT EXISTS conversations (
-        id TEXT PRIMARY KEY,
-        conversation_id TEXT,
-        type TEXT DEFAULT 'conversation',
-        \"createdAt\" TEXT,
-        \"updatedAt\" TEXT,
-        user_id TEXT NOT NULL,
-        title TEXT
-    );
-    CREATE TABLE IF NOT EXISTS messages (
-        id TEXT PRIMARY KEY,
-        type TEXT DEFAULT 'message',
-        \"createdAt\" TEXT,
-        \"updatedAt\" TEXT,
-        user_id TEXT,
-        conversation_id TEXT,
-        role TEXT,
-        content TEXT,
-        feedback TEXT
-    );
-    CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
-    CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
-" 2>/dev/null && echo -e "${GREEN}  ✓ Chat history tables ready${NC}" || \
-    echo -e "${YELLOW}  ⚠ Could not create chat history tables (check PostgreSQL container)${NC}"
+    # Create chat history tables (matching PostgresConversationClient schema)
+    docker exec "$POSTGRES_CONTAINER" psql -U $POSTGRES_USER -d chathistory -c "
+        CREATE TABLE IF NOT EXISTS conversations (
+            id TEXT PRIMARY KEY,
+            conversation_id TEXT,
+            type TEXT DEFAULT 'conversation',
+            \"createdAt\" TEXT,
+            \"updatedAt\" TEXT,
+            user_id TEXT NOT NULL,
+            title TEXT
+        );
+        CREATE TABLE IF NOT EXISTS messages (
+            id TEXT PRIMARY KEY,
+            type TEXT DEFAULT 'message',
+            \"createdAt\" TEXT,
+            \"updatedAt\" TEXT,
+            user_id TEXT,
+            conversation_id TEXT,
+            role TEXT,
+            content TEXT,
+            feedback TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id);
+        CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
+    " 2>/dev/null && echo -e "${GREEN}  ✓ Chat history tables ready${NC}" || \
+        echo -e "${YELLOW}  ⚠ Could not create chat history tables (check PostgreSQL container)${NC}"
 
-# Export chat history env vars to use local PostgreSQL
-export CHAT_HISTORY_DATABASE_TYPE=PostgreSQL
-export CHAT_HISTORY_PG_USER=$POSTGRES_USER
-export CHAT_HISTORY_PG_PASSWORD=$POSTGRES_PASSWORD
-export CHAT_HISTORY_PG_HOST=127.0.0.1
-export CHAT_HISTORY_PG_PORT=$POSTGRES_PORT
-export CHAT_HISTORY_PG_DATABASE=chathistory
+    # Export chat history env vars to use local PostgreSQL
+    export CHAT_HISTORY_DATABASE_TYPE=PostgreSQL
+    export CHAT_HISTORY_PG_USER=$POSTGRES_USER
+    export CHAT_HISTORY_PG_PASSWORD=$POSTGRES_PASSWORD
+    export CHAT_HISTORY_PG_HOST=127.0.0.1
+    export CHAT_HISTORY_PG_PORT=$POSTGRES_PORT
+    export CHAT_HISTORY_PG_DATABASE=chathistory
 
-echo -e "${GREEN}  ✓ Chat history configured for local PostgreSQL${NC}"
+    echo -e "${GREEN}  ✓ Chat history configured for local PostgreSQL${NC}"
+fi
 echo ""
 
 # Kill any existing processes on our ports (in parallel for speed)
