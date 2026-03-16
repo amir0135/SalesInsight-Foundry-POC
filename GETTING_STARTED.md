@@ -53,7 +53,7 @@ Open the **Chat UI** at **http://localhost:5173**.
 
 ### Sales Queries (NL2SQL)
 
-If you have a Snowflake account with an `ORDERHISTORYLINE` table, connect it via the Admin UI or `.env` ([Snowflake setup guide](docs/snowflake_setup.md)). Then try:
+By default, the POC uses **bundled CSV data** from the `data/` folder — no external database required. You can start asking sales questions right away:
 
 ```
 What are the top 10 products by revenue?
@@ -61,7 +61,7 @@ Show me turnover by region for FY 25/26
 Which customers have the highest order volume?
 ```
 
-**No Snowflake?** Run `./scripts/quickstart_snowflake.sh --local` to test with the bundled CSV data.
+> **Want to connect Snowflake?** If you have a Snowflake account with an `ORDERHISTORYLINE` table, you can connect it via the **Admin UI → Database Connection** page, or by adding credentials to your `.env` file. See the [Snowflake setup guide](docs/snowflake_setup.md) for details. This is **optional** — the POC works fully without it.
 
 ---
 
